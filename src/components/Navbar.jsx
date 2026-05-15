@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, GraduationCap, ChevronDown } from 'lucide-react';
 
 const navLinks = [
@@ -23,6 +23,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [legalOpen, setLegalOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const isHome = location.pathname === '/';
 
   useEffect(() => {
@@ -31,16 +32,47 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleNavClick = (e, href) => {
+  // Unified click handler that works on single tap for both mobile and desktop
+  const handleNavClick = useCallback((href, route) => {
+    setIsOpen(false);
+    setLegalOpen(false);
     if (isHome) {
-      e.preventDefault();
-      setIsOpen(false);
+      // On home page, smooth scroll to the section
       const el = document.querySelector(href);
       if (el) el.scrollIntoView({ behavior: 'smooth' });
     } else {
-      setIsOpen(false);
+      // On other pages, navigate to home with hash
+      navigate(route);
     }
-  };
+  }, [isHome, navigate]);
+
+  const handleBookDemo = useCallback(() => {
+    setIsOpen(false);
+    if (isHome) {
+      document.querySelector('#find-tutor')?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      navigate('/#find-tutor');
+    }
+  }, [isHome, navigate]);
+
+  // Toggle legal dropdown on click (works with single tap on mobile)
+  const toggleLegal = useCallback(() => {
+    setLegalOpen(prev => !prev);
+  }, []);
+
+  // Close legal dropdown when clicking outside
+  useEffect(() => {
+    if (!legalOpen) return;
+    const handleClickOutside = () => setLegalOpen(false);
+    // Delay adding the listener so the current click doesn't immediately close it
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [legalOpen]);
 
   return (
     <motion.nav
@@ -58,7 +90,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link
             to="/"
-            className="flex items-center gap-2 group"
+            className="nav-link flex items-center gap-2 group"
           >
             <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
               <GraduationCap className="w-6 h-6 text-primary" />
@@ -72,31 +104,26 @@ export default function Navbar() {
           {/* Desktop Links */}
           <div className="hidden lg:flex items-center gap-1">
             {navLinks.map((link) => (
-              isHome ? (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  onClick={(e) => handleNavClick(e, link.href)}
-                  className="text-white/80 hover:text-secondary px-3 py-2 text-sm font-medium transition-colors relative group"
-                >
-                  {link.name}
-                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-secondary transition-all duration-300 group-hover:w-3/4 rounded-full" />
-                </a>
-              ) : (
-                <Link
-                  key={link.name}
-                  to={link.route}
-                  className="text-white/80 hover:text-secondary px-3 py-2 text-sm font-medium transition-colors relative group"
-                >
-                  {link.name}
-                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-secondary transition-all duration-300 group-hover:w-3/4 rounded-full" />
-                </Link>
-              )
+              <button
+                key={link.name}
+                type="button"
+                onClick={() => handleNavClick(link.href, link.route)}
+                className="nav-link text-white/80 hover:text-secondary px-3 py-2 text-sm font-medium transition-colors relative group"
+              >
+                {link.name}
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-secondary transition-all duration-300 group-hover:w-3/4 rounded-full" />
+              </button>
             ))}
 
             {/* Legal Dropdown */}
-            <div className="relative" onMouseEnter={() => setLegalOpen(true)} onMouseLeave={() => setLegalOpen(false)}>
-              <button className="text-white/80 hover:text-secondary px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={toggleLegal}
+                onMouseEnter={() => setLegalOpen(true)}
+                onMouseLeave={() => setLegalOpen(false)}
+                className="nav-link text-white/80 hover:text-secondary px-3 py-2 text-sm font-medium transition-colors flex items-center gap-1"
+              >
                 Legal <ChevronDown className={`w-3.5 h-3.5 transition-transform ${legalOpen ? 'rotate-180' : ''}`} />
               </button>
               <AnimatePresence>
@@ -107,12 +134,15 @@ export default function Navbar() {
                     exit={{ opacity: 0, y: 8 }}
                     transition={{ duration: 0.2 }}
                     className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 py-2 min-w-48 overflow-hidden"
+                    onMouseEnter={() => setLegalOpen(true)}
+                    onMouseLeave={() => setLegalOpen(false)}
                   >
                     {legalLinks.map((link) => (
                       <Link
                         key={link.name}
                         to={link.route}
-                        className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-secondary/10 hover:text-primary transition-colors font-medium"
+                        onClick={() => setLegalOpen(false)}
+                        className="nav-link block px-4 py-2.5 text-sm text-gray-700 hover:bg-secondary/10 hover:text-primary transition-colors font-medium"
                       >
                         {link.name}
                       </Link>
@@ -125,7 +155,7 @@ export default function Navbar() {
             {/* Plans link */}
             <Link
               to="/membership"
-              className={`text-white/80 hover:text-secondary px-3 py-2 text-sm font-medium transition-colors relative group ${location.pathname === '/membership' ? 'text-secondary' : ''}`}
+              className={`nav-link text-white/80 hover:text-secondary px-3 py-2 text-sm font-medium transition-colors relative group ${location.pathname === '/membership' ? 'text-secondary' : ''}`}
             >
               Plans
               <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0 h-0.5 bg-secondary transition-all duration-300 group-hover:w-3/4 rounded-full" />
@@ -136,23 +166,24 @@ export default function Navbar() {
           <div className="hidden lg:flex items-center gap-3">
             <Link
               to="/register"
-              className="text-white/80 hover:text-secondary px-4 py-2 text-sm font-medium transition-colors"
+              className="nav-link text-white/80 hover:text-secondary px-4 py-2 text-sm font-medium transition-colors"
             >
               Register
             </Link>
-            <Link
-              to={isHome ? '/#find-tutor' : '/'}
-              onClick={isHome ? (e) => { e.preventDefault(); document.querySelector('#find-tutor')?.scrollIntoView({ behavior: 'smooth' }); } : undefined}
-              className="bg-secondary text-primary font-bold px-6 py-2.5 rounded-full text-sm hover:bg-secondary-light transition-all hover:shadow-lg hover:shadow-secondary/30 pulse-glow"
+            <button
+              type="button"
+              onClick={handleBookDemo}
+              className="nav-link bg-secondary text-primary font-bold px-6 py-2.5 rounded-full text-sm hover:bg-secondary-light transition-all hover:shadow-lg hover:shadow-secondary/30 pulse-glow"
             >
               Book Free Demo
-            </Link>
+            </button>
           </div>
 
           {/* Mobile Toggle */}
           <button
+            type="button"
             onClick={() => setIsOpen(!isOpen)}
-            className="lg:hidden text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="nav-link lg:hidden text-white p-2 hover:bg-white/10 rounded-lg transition-colors"
             aria-label="Toggle menu"
           >
             {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -172,29 +203,17 @@ export default function Navbar() {
           >
             <div className="px-4 py-4 space-y-1">
               {navLinks.map((link, i) => (
-                isHome ? (
-                  <motion.a
-                    key={link.name}
-                    href={link.href}
-                    onClick={(e) => handleNavClick(e, link.href)}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="block text-white/80 hover:text-secondary hover:bg-white/5 px-4 py-3 rounded-lg text-sm font-medium transition-all"
-                  >
-                    {link.name}
-                  </motion.a>
-                ) : (
-                  <motion.div key={link.name} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}>
-                    <Link
-                      to={link.route}
-                      onClick={() => setIsOpen(false)}
-                      className="block text-white/80 hover:text-secondary hover:bg-white/5 px-4 py-3 rounded-lg text-sm font-medium transition-all"
-                    >
-                      {link.name}
-                    </Link>
-                  </motion.div>
-                )
+                <motion.button
+                  key={link.name}
+                  type="button"
+                  onClick={() => handleNavClick(link.href, link.route)}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="nav-link block w-full text-left text-white/80 hover:text-secondary hover:bg-white/5 px-4 py-3 rounded-lg text-sm font-medium transition-all"
+                >
+                  {link.name}
+                </motion.button>
               ))}
 
               {/* Mobile Legal Links */}
@@ -202,29 +221,29 @@ export default function Navbar() {
                 <p className="px-4 py-2 text-white/40 text-xs font-semibold uppercase tracking-wider">Legal</p>
                 {legalLinks.map((link, i) => (
                   <motion.div key={link.name} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: (navLinks.length + i) * 0.05 }}>
-                    <Link to={link.route} onClick={() => setIsOpen(false)} className="block text-white/60 hover:text-secondary hover:bg-white/5 px-4 py-3 rounded-lg text-sm font-medium transition-all">
+                    <Link to={link.route} onClick={() => setIsOpen(false)} className="nav-link block text-white/60 hover:text-secondary hover:bg-white/5 px-4 py-3 rounded-lg text-sm font-medium transition-all">
                       {link.name}
                     </Link>
                   </motion.div>
                 ))}
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: (navLinks.length + 3) * 0.05 }}>
-                  <Link to="/membership" onClick={() => setIsOpen(false)} className="block text-white/60 hover:text-secondary hover:bg-white/5 px-4 py-3 rounded-lg text-sm font-medium transition-all">
+                  <Link to="/membership" onClick={() => setIsOpen(false)} className="nav-link block text-white/60 hover:text-secondary hover:bg-white/5 px-4 py-3 rounded-lg text-sm font-medium transition-all">
                     Membership Plans
                   </Link>
                 </motion.div>
               </div>
 
               <div className="pt-3 space-y-2">
-                <Link to="/register" onClick={() => setIsOpen(false)} className="block text-center bg-white/10 border border-white/20 text-white font-semibold px-6 py-3 rounded-full text-sm hover:bg-white/20 transition-all">
+                <Link to="/register" onClick={() => setIsOpen(false)} className="nav-link block text-center bg-white/10 border border-white/20 text-white font-semibold px-6 py-3 rounded-full text-sm hover:bg-white/20 transition-all">
                   Register as Tutor
                 </Link>
-                <Link
-                  to="/"
-                  onClick={() => { setIsOpen(false); if (isHome) document.querySelector('#find-tutor')?.scrollIntoView({ behavior: 'smooth' }); }}
-                  className="block text-center bg-secondary text-primary font-bold px-6 py-3 rounded-full text-sm hover:bg-secondary-light transition-all"
+                <button
+                  type="button"
+                  onClick={handleBookDemo}
+                  className="nav-link block w-full text-center bg-secondary text-primary font-bold px-6 py-3 rounded-full text-sm hover:bg-secondary-light transition-all"
                 >
                   Book Free Demo
-                </Link>
+                </button>
               </div>
             </div>
           </motion.div>

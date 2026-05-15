@@ -18,6 +18,15 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Fix double-tap issue on mobile touch devices */
+/* touch-action: manipulation disables double-tap-to-zoom, */
+/* allowing single-tap clicks to fire immediately */
+.nav-link,
+a, button, [role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
