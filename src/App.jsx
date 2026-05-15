@@ -1,22 +1,47 @@
+import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { lazy, Suspense } from 'react';
 import Navbar from './components/Navbar';
-import HeroSection from './components/HeroSection';
-import AboutSection from './components/AboutSection';
-import ServicesSection from './components/ServicesSection';
-import HowItWorks from './components/HowItWorks';
-import FindTutorForm from './components/FindTutorForm';
-import BecomeTutorForm from './components/BecomeTutorForm';
-import StatsCounter from './components/StatsCounter';
-import Testimonials from './components/Testimonials';
-import FAQ from './components/FAQ';
-import ContactSection from './components/ContactSection';
 import Footer from './components/Footer';
 import WhatsAppButton from './components/WhatsAppButton';
 import ScrollToTop from './components/ScrollToTop';
+import ScrollToTopOnNavigate from './components/ScrollToTopOnNavigate';
+
+// Lazy load pages
+const HomePage = lazy(() => import('./pages/HomePage'));
+const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
+const TutorRegistration = lazy(() => import('./pages/TutorRegistration'));
+const MembershipPlans = lazy(() => import('./pages/MembershipPlans'));
+const TutorDashboard = lazy(() => import('./pages/TutorDashboard'));
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-primary/20 border-t-secondary rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-gray-400 text-sm font-medium">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+function Layout({ children, hideNavFooter }) {
+  return (
+    <div className="min-h-screen bg-white">
+      {!hideNavFooter && <Navbar />}
+      <main>{children}</main>
+      {!hideNavFooter && <Footer />}
+      <WhatsAppButton />
+      <ScrollToTop />
+    </div>
+  );
+}
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-white">
+    <>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -37,22 +62,18 @@ export default function App() {
           },
         }}
       />
-      <Navbar />
-      <main>
-        <HeroSection />
-        <AboutSection />
-        <ServicesSection />
-        <HowItWorks />
-        <FindTutorForm />
-        <StatsCounter />
-        <BecomeTutorForm />
-        <Testimonials />
-        <FAQ />
-        <ContactSection />
-      </main>
-      <Footer />
-      <WhatsAppButton />
-      <ScrollToTop />
-    </div>
+      <ScrollToTopOnNavigate />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Layout><HomePage /></Layout>} />
+          <Route path="/terms" element={<Layout><TermsAndConditions /></Layout>} />
+          <Route path="/privacy" element={<Layout><PrivacyPolicy /></Layout>} />
+          <Route path="/refund" element={<Layout><RefundPolicy /></Layout>} />
+          <Route path="/register" element={<Layout><TutorRegistration /></Layout>} />
+          <Route path="/membership" element={<Layout><MembershipPlans /></Layout>} />
+          <Route path="/dashboard" element={<Layout hideNavFooter><TutorDashboard /></Layout>} />
+        </Routes>
+      </Suspense>
+    </>
   );
 }

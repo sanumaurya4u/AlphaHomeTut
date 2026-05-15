@@ -1,21 +1,25 @@
+import { Link } from 'react-router-dom';
 import { GraduationCap, Phone, Mail, MapPin, Globe, Camera, MessageSquare, Play, ArrowRight } from 'lucide-react';
 
 const quickLinks = [
-  { name: 'Home', href: '#home' },
-  { name: 'About Us', href: '#about' },
-  { name: 'Services', href: '#services' },
-  { name: 'Find Tutor', href: '#find-tutor' },
-  { name: 'Become Tutor', href: '#become-tutor' },
-  { name: 'Contact', href: '#contact' },
+  { name: 'Home', route: '/' },
+  { name: 'About Us', route: '/#about' },
+  { name: 'Services', route: '/#services' },
+  { name: 'Find Tutor', route: '/#find-tutor' },
+  { name: 'Become Tutor', route: '/#become-tutor' },
+  { name: 'Contact', route: '/#contact' },
 ];
 
-const serviceLinks = [
-  'Home Tuition',
-  'Online Classes',
-  'Competitive Exams',
-  'School Coaching',
-  'Language Courses',
-  'Skill Development',
+const tutorLinks = [
+  { name: 'Register as Tutor', route: '/register' },
+  { name: 'Membership Plans', route: '/membership' },
+  { name: 'Tutor Dashboard', route: '/dashboard' },
+];
+
+const legalLinks = [
+  { name: 'Terms & Conditions', route: '/terms' },
+  { name: 'Privacy Policy', route: '/privacy' },
+  { name: 'Refund Policy', route: '/refund' },
 ];
 
 const socialLinks = [
@@ -26,12 +30,6 @@ const socialLinks = [
 ];
 
 export default function Footer() {
-  const handleClick = (e, href) => {
-    e.preventDefault();
-    const el = document.querySelector(href);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
-
   return (
     <footer className="bg-primary-dark text-white relative overflow-hidden">
       <div className="absolute inset-0">
@@ -40,10 +38,10 @@ export default function Footer() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
         {/* Main Footer */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10 py-16">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10 py-16">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
+            <Link to="/" className="flex items-center gap-2 mb-4">
               <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center">
                 <GraduationCap className="w-6 h-6 text-primary" />
               </div>
@@ -51,7 +49,7 @@ export default function Footer() {
                 <span className="font-bold text-lg leading-tight block">Alpha</span>
                 <span className="text-secondary text-xs font-semibold tracking-wider">HOME TUITION</span>
               </div>
-            </div>
+            </Link>
             <p className="text-white/50 text-sm leading-relaxed mb-6">
               Connecting students with verified tutors for personalized learning at home. Quality education at your doorstep.
             </p>
@@ -70,25 +68,37 @@ export default function Footer() {
             <ul className="space-y-3">
               {quickLinks.map((link, i) => (
                 <li key={i}>
-                  <a href={link.href} onClick={(e) => handleClick(e, link.href)} className="text-white/50 hover:text-secondary text-sm flex items-center gap-2 transition-colors group">
+                  <Link to={link.route} className="text-white/50 hover:text-secondary text-sm flex items-center gap-2 transition-colors group">
                     <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                     {link.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Services */}
+          {/* For Tutors */}
           <div>
-            <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">Services</h3>
+            <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">For Tutors</h3>
             <ul className="space-y-3">
-              {serviceLinks.map((name, i) => (
+              {tutorLinks.map((link, i) => (
                 <li key={i}>
-                  <span className="text-white/50 text-sm flex items-center gap-2">
-                    <ArrowRight className="w-3 h-3" />
-                    {name}
-                  </span>
+                  <Link to={link.route} className="text-white/50 hover:text-secondary text-sm flex items-center gap-2 transition-colors group">
+                    <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider mt-8">Legal</h3>
+            <ul className="space-y-3">
+              {legalLinks.map((link, i) => (
+                <li key={i}>
+                  <Link to={link.route} className="text-white/50 hover:text-secondary text-sm flex items-center gap-2 transition-colors group">
+                    <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                    {link.name}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -111,17 +121,31 @@ export default function Footer() {
               </li>
               <li className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 text-secondary flex-shrink-0 mt-0.5" />
-                <p className="text-white/50 text-sm">Alpha Home Tuition, Bihar, India</p>
+                <p className="text-white/50 text-sm">Alpha Home Tuition Pvt. Ltd.<br />Bihar, India</p>
               </li>
             </ul>
           </div>
         </div>
 
+        {/* Legal Disclaimer */}
+        <div className="border-t border-white/10 py-4">
+          <p className="text-white/30 text-xs text-center leading-relaxed">
+            Alpha Home Tuition Pvt. Ltd. acts as a facilitator between tutors and students. All tutor profiles are verified.
+            The company is not directly liable for payment disputes between tutors and guardians.
+            All legal disputes fall under the jurisdiction of courts in Patna, Bihar.
+          </p>
+        </div>
+
         {/* Bottom Bar */}
         <div className="border-t border-white/10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-white/40 text-sm text-center">
-            &copy; 2025 Alpha Home Tuition. All Rights Reserved.
+            &copy; {new Date().getFullYear()} Alpha Home Tuition Pvt. Ltd. All Rights Reserved.
           </p>
+          <div className="flex items-center gap-4">
+            <Link to="/terms" className="text-white/30 hover:text-white/60 text-xs transition-colors">Terms</Link>
+            <Link to="/privacy" className="text-white/30 hover:text-white/60 text-xs transition-colors">Privacy</Link>
+            <Link to="/refund" className="text-white/30 hover:text-white/60 text-xs transition-colors">Refund</Link>
+          </div>
           <p className="text-white/30 text-xs">
             From Learning to Leading...
           </p>
