@@ -1,21 +1,40 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Phone, Mail, MapPin, Send, Clock } from 'lucide-react';
+import { Phone, Mail, MapPin, Send, Clock, Loader2 } from 'lucide-react';
+import { submitContactMessage } from '@/services/contactService';
+import { createNotification } from '@/services/notificationService';
+import { NOTIFICATION_TYPES } from '@/constants';
 
 export default function ContactSection() {
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.message) {
       toast.error('Please fill in your name and message.');
       return;
     }
-    toast.success('Message sent successfully! We will get back to you soon.', { duration: 5000 });
-    setFormData({ name: '', email: '', phone: '', message: '' });
+    setLoading(true);
+    try {
+      await submitContactMessage(formData);
+      await createNotification({
+        type: NOTIFICATION_TYPES.NEW_CONTACT,
+        title: 'New Contact Message',
+        message: `New message from ${formData.name}`,
+        referenceType: 'contact',
+      });
+      toast.success('Message sent successfully! We will get back to you soon.', { duration: 5000 });
+      setFormData({ name: '', email: '', phone: '', message: '' });
+    } catch (error) {
+      console.error('Contact submit error:', error);
+      toast.error(error.message || 'Failed to send message. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const contactInfo = [
@@ -90,8 +109,8 @@ export default function ContactSection() {
                 <label className="block text-primary font-semibold text-sm mb-2">Message *</label>
                 <textarea name="message" value={formData.message} onChange={handleChange} placeholder="Write your message..." rows={5} className={inputClass + ' resize-none'} />
               </div>
-              <button type="submit" className="w-full bg-primary hover:bg-primary-light text-white font-bold py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-primary/20 flex items-center justify-center gap-2">
-                <Send className="w-5 h-5" />Send Message
+              <button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary-light text-white font-bold py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Sending...</> : <><Send className="w-5 h-5" />Send Message</>}
               </button>
             </form>
           </motion.div>

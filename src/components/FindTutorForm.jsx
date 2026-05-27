@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { Search, User, BookOpen, MapPin, Clock, IndianRupee, Monitor, Home } from 'lucide-react';
+import { Search, User, BookOpen, MapPin, Clock, IndianRupee, Monitor, Home, Loader2 } from 'lucide-react';
+import { createDemoRequest } from '@/services/demoRequestService';
+import { createNotification } from '@/services/notificationService';
+import { NOTIFICATION_TYPES } from '@/constants';
 
 export default function FindTutorForm() {
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     studentName: '', studentClass: '', subject: '', location: '',
     timing: '', budget: '', mode: 'home',
@@ -13,14 +17,38 @@ export default function FindTutorForm() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.studentName || !formData.studentClass || !formData.subject || !formData.location) {
       toast.error('Please fill in all required fields.');
       return;
     }
-    toast.success('Your tuition request has been submitted! We will contact you within 24 hours.', { duration: 5000 });
-    setFormData({ studentName: '', studentClass: '', subject: '', location: '', timing: '', budget: '', mode: 'home' });
+    setLoading(true);
+    try {
+      await createDemoRequest({
+        student_name: formData.studentName,
+        student_class: formData.studentClass,
+        subject: formData.subject,
+        location: formData.location,
+        timing: formData.timing,
+        budget: formData.budget,
+        mode: formData.mode,
+        status: 'Pending',
+      });
+      await createNotification({
+        type: NOTIFICATION_TYPES.NEW_DEMO_REQUEST,
+        title: 'New Demo Request',
+        message: `New demo request from ${formData.studentName} for ${formData.subject}`,
+        referenceType: 'demo_request',
+      });
+      toast.success('Your tuition request has been submitted! We will contact you within 24 hours.', { duration: 5000 });
+      setFormData({ studentName: '', studentClass: '', subject: '', location: '', timing: '', budget: '', mode: 'home' });
+    } catch (error) {
+      console.error('Submit error:', error);
+      toast.error(error.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const inputClass = 'w-full bg-white border border-gray-200 rounded-xl px-4 py-3.5 text-gray-800 placeholder-gray-400 focus:border-secondary transition-all text-sm';
@@ -90,8 +118,8 @@ export default function FindTutorForm() {
               </div>
             </div>
 
-            <button type="submit" className="w-full bg-primary hover:bg-primary-light text-white font-bold py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-primary/20 flex items-center justify-center gap-2">
-              <Search className="w-5 h-5" />Find My Tutor
+            <button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary-light text-white font-bold py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+              {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Submitting...</> : <><Search className="w-5 h-5" />Find My Tutor</>}
             </button>
           </form>
         </motion.div>

@@ -6,8 +6,9 @@ import Footer from './components/Footer';
 import WhatsAppButton from './components/WhatsAppButton';
 import ScrollToTop from './components/ScrollToTop';
 import ScrollToTopOnNavigate from './components/ScrollToTopOnNavigate';
+import { AuthProvider } from './context/AuthContext';
 
-// Lazy load pages
+// Lazy load public pages
 const HomePage = lazy(() => import('./pages/HomePage'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
@@ -15,6 +16,20 @@ const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
 const TutorRegistration = lazy(() => import('./pages/TutorRegistration'));
 const MembershipPlans = lazy(() => import('./pages/MembershipPlans'));
 const TutorDashboard = lazy(() => import('./pages/TutorDashboard'));
+
+// Lazy load admin pages
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
+const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
+const ProtectedRoute = lazy(() => import('./routes/ProtectedRoute'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const DemoRequests = lazy(() => import('./pages/admin/DemoRequests'));
+const TutorManagement = lazy(() => import('./pages/admin/TutorManagement'));
+const Assignments = lazy(() => import('./pages/admin/Assignments'));
+const ContactMessages = lazy(() => import('./pages/admin/ContactMessages'));
+const MembershipManagement = lazy(() => import('./pages/admin/MembershipManagement'));
+const Notifications = lazy(() => import('./pages/admin/Notifications'));
+const Payments = lazy(() => import('./pages/admin/Payments'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 
 function PageLoader() {
   return (
@@ -41,7 +56,7 @@ function Layout({ children, hideNavFooter }) {
 
 export default function App() {
   return (
-    <>
+    <AuthProvider>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -65,6 +80,7 @@ export default function App() {
       <ScrollToTopOnNavigate />
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<Layout><HomePage /></Layout>} />
           <Route path="/terms" element={<Layout><TermsAndConditions /></Layout>} />
           <Route path="/privacy" element={<Layout><PrivacyPolicy /></Layout>} />
@@ -72,8 +88,25 @@ export default function App() {
           <Route path="/register" element={<Layout><TutorRegistration /></Layout>} />
           <Route path="/membership" element={<Layout><MembershipPlans /></Layout>} />
           <Route path="/dashboard" element={<Layout hideNavFooter><TutorDashboard /></Layout>} />
+
+          {/* Admin Routes */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin" element={<ProtectedRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route path="dashboard" element={<AdminDashboard />} />
+              <Route path="demo-requests" element={<DemoRequests />} />
+              <Route path="tutors" element={<TutorManagement />} />
+              <Route path="assignments" element={<Assignments />} />
+              <Route path="contacts" element={<ContactMessages />} />
+              <Route path="memberships" element={<MembershipManagement />} />
+              <Route path="notifications" element={<Notifications />} />
+              <Route path="payments" element={<Payments />} />
+              <Route path="settings" element={<AdminSettings />} />
+            </Route>
+          </Route>
         </Routes>
       </Suspense>
-    </>
+    </AuthProvider>
   );
 }
+

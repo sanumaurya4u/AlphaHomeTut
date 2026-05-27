@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   User, Phone, Mail, MapPin, BookOpen, GraduationCap, Briefcase,
   Upload, Camera, CreditCard, FileText, Shield, Crown, CheckCircle2,
-  ArrowLeft, ArrowRight, Sparkles, ChevronRight
+  ArrowLeft, ArrowRight, Sparkles, ChevronRight, Loader2
 } from 'lucide-react';
+import { registerTutor } from '@/services/tutorService';
+import { uploadDocument } from '@/services/uploadService';
+import { createMembership } from '@/services/membershipService';
+import { createNotification } from '@/services/notificationService';
+import { NOTIFICATION_TYPES, MEMBERSHIP_PLANS } from '@/constants';
 
 const stepTitles = [
   { title: 'Personal Details', icon: User },
@@ -20,6 +25,8 @@ const stepTitles = [
 export default function TutorRegistration() {
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const fileInputRefs = useRef({});
   const [formData, setFormData] = useState({
     fullName: '', phone: '', email: '', address: '', city: '', gender: '',
     tenthMarks: '', twelfthMarks: '', degree: '', college: '', subjects: '',
@@ -30,8 +37,12 @@ export default function TutorRegistration() {
   });
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    const { name, value, type, checked, files } = e.target;
+    if (type === 'file') {
+      setFormData(prev => ({ ...prev, [name]: files[0] || null }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    }
   };
 
   const validateStep = () => {
@@ -91,10 +102,75 @@ export default function TutorRegistration() {
     if (step > 0) setStep(step - 1);
   };
 
-  const handleSubmit = () => {
-    if (validateStep()) {
+  const handleSubmit = async () => {
+    if (!validateStep()) return;
+    setLoading(true);
+    try {
+      // 1. Register tutor in database
+      const tutorData = {
+        full_name: formData.fullName,
+        phone: formData.phone,
+        email: formData.email,
+        city: formData.city,
+        address: formData.address,
+        gender: formData.gender,
+        tenth_marks: formData.tenthMarks,
+        twelfth_marks: formData.twelfthMarks,
+        degree: formData.degree,
+        college: formData.college,
+        subjects: formData.subjects,
+        experience: formData.experience,
+        preferred_classes: formData.preferredClasses,
+        preferred_subjects: formData.preferredSubjects,
+        expected_salary: formData.expectedSalary,
+        membership_plan: formData.membership,
+        status: 'Pending',
+      };
+      const tutor = await registerTutor(tutorData);
+
+      // 2. Upload documents
+      const docMap = {
+        passportPhoto: 'passport_photo',
+        aadharCard: 'aadhaar_card',
+        marksheet: 'marksheet',
+        degreeCert: 'degree_certificate',
+      };
+      for (const [key, docType] of Object.entries(docMap)) {
+        if (formData[key]) {
+          try {
+            await uploadDocument(formData[key], tutor.id, docType);
+          } catch (uploadErr) {
+            console.error(`Failed to upload ${docType}:`, uploadErr);
+          }
+        }
+      }
+
+      // 3. Create membership record
+      const plan = MEMBERSHIP_PLANS.find(p => p.name === formData.membership);
+      if (plan) {
+        await createMembership({
+          tutor_id: tutor.id,
+          plan_name: plan.name,
+          amount: plan.price,
+        });
+      }
+
+      // 4. Create notification for admin
+      await createNotification({
+        type: NOTIFICATION_TYPES.NEW_TUTOR,
+        title: 'New Tutor Registration',
+        message: `${formData.fullName} has registered as a tutor with ${formData.membership} plan.`,
+        referenceId: tutor.id,
+        referenceType: 'tutor',
+      });
+
       setSubmitted(true);
       toast.success('Registration submitted successfully! Our team will review your application.', { duration: 6000 });
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast.error(error.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -318,12 +394,23 @@ export default function TutorRegistration() {
                   ].map((doc) => (
                     <div key={doc.name}>
                       <label className={labelClass}><doc.icon className="w-4 h-4 inline mr-1" />{doc.label}</label>
-                      <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-secondary/50 transition-colors cursor-pointer group">
+                      <div
+                        onClick={() => fileInputRefs.current[doc.name]?.click()}
+                        className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center hover:border-secondary/50 transition-colors cursor-pointer group"
+                      >
+                        <input
+                          ref={(el) => (fileInputRefs.current[doc.name] = el)}
+                          type="file"
+                          name={doc.name}
+                          accept={doc.accept}
+                          onChange={handleChange}
+                          className="hidden"
+                        />
                         <Upload className="w-8 h-8 text-gray-300 group-hover:text-secondary mx-auto mb-2 transition-colors" />
                         <p className="text-gray-400 text-sm">Click to upload</p>
                         <p className="text-gray-300 text-xs mt-1">JPG, PNG, PDF up to 5MB</p>
                         {formData[doc.name] && (
-                          <p className="text-emerald-500 text-xs mt-2 font-medium">✓ File selected</p>
+                          <p className="text-emerald-500 text-xs mt-2 font-medium">✓ {formData[doc.name].name}</p>
                         )}
                       </div>
                     </div>
@@ -453,9 +540,14 @@ export default function TutorRegistration() {
             ) : (
               <button
                 onClick={handleSubmit}
-                className="flex items-center gap-2 bg-secondary hover:bg-secondary-light text-primary font-bold px-8 py-3 rounded-xl text-sm transition-all hover:shadow-lg hover:shadow-secondary/30 pulse-glow"
+                disabled={loading}
+                className="flex items-center gap-2 bg-secondary hover:bg-secondary-light text-primary font-bold px-8 py-3 rounded-xl text-sm transition-all hover:shadow-lg hover:shadow-secondary/30 pulse-glow disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Sparkles className="w-4 h-4" /> Submit Registration
+                {loading ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
+                ) : (
+                  <><Sparkles className="w-4 h-4" /> Submit Registration</>
+                )}
               </button>
             )}
           </div>
