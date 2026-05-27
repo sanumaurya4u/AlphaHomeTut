@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { GraduationCap, Phone, Mail, MapPin, Globe, Camera, MessageSquare, Play, ArrowRight } from 'lucide-react';
+import { Phone, Mail, MapPin, Globe, Camera, MessageSquare, Play, ArrowRight } from 'lucide-react';
 
 const quickLinks = [
   { name: 'Home', route: '/' },
@@ -42,13 +42,7 @@ export default function Footer() {
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
             <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <span className="font-bold text-lg leading-tight block">Alpha</span>
-                <span className="text-secondary text-xs font-semibold tracking-wider">HOME TUITION</span>
-              </div>
+              <img src="/logo.png" alt="Alpha Home Tuition" className="h-14 w-auto object-contain" />
             </Link>
             <p className="text-white/50 text-sm leading-relaxed mb-6">
               Connecting students with verified tutors for personalized learning at home. Quality education at your doorstep.

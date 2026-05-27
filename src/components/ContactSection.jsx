@@ -21,20 +21,41 @@ export default function ContactSection() {
     }
     setLoading(true);
     try {
-      await submitContactMessage(formData);
-      await Promise.all([
-        createNotification({
-          type: NOTIFICATION_TYPES.NEW_CONTACT,
-          title: 'New Contact Message',
-          message: `New message from ${formData.name}`,
-          referenceType: 'contact',
+      // Run EmailJS and Supabase in parallel so one failing doesn't block the other
+      const [emailResult, supabaseResult] = await Promise.allSettled([
+        sendContactEmail(formData),
+        submitContactMessage(formData).then(async () => {
+          await createNotification({
+            type: NOTIFICATION_TYPES.NEW_CONTACT,
+            title: 'New Contact Message',
+            message: `New message from ${formData.name}`,
+            referenceType: 'contact',
+          });
         }),
-        sendContactEmail(formData).catch((err) =>
-          console.error('EmailJS send failed:', err)
-        ),
       ]);
-      toast.success('Message sent successfully! We will get back to you soon.', { duration: 5000 });
-      setFormData({ name: '', email: '', phone: '', message: '' });
+
+      const emailFailed = emailResult.status === 'rejected';
+      const supabaseFailed = supabaseResult.status === 'rejected';
+
+      if (emailFailed) {
+        console.error('EmailJS send failed:', emailResult.reason);
+      }
+      if (supabaseFailed) {
+        console.error('Supabase submit failed:', supabaseResult.reason);
+      }
+
+      if (emailFailed && supabaseFailed) {
+        // Both failed — nothing was delivered
+        toast.error('Failed to send message. Please try again.');
+      } else if (emailFailed) {
+        // Supabase saved but email didn't send — still OK for admin
+        toast.success('Message received! We will get back to you soon.', { duration: 5000 });
+        setFormData({ name: '', email: '', phone: '', message: '' });
+      } else {
+        // Email sent (and possibly Supabase too) — success
+        toast.success('Message sent successfully! We will get back to you soon.', { duration: 5000 });
+        setFormData({ name: '', email: '', phone: '', message: '' });
+      }
     } catch (error) {
       console.error('Contact submit error:', error);
       toast.error(error.message || 'Failed to send message. Please try again.');

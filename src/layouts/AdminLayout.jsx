@@ -63,13 +63,7 @@ export default function AdminLayout() {
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-secondary to-secondary-dark rounded-lg flex items-center justify-center">
-              <GraduationCap className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-white font-bold text-sm leading-tight">Alpha Home</p>
-              <p className="text-secondary text-[10px] font-medium leading-tight">Admin Panel</p>
-            </div>
+            <img src="/logo.png" alt="Alpha Home Tuition" className="h-10 w-auto object-contain" />
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-white/60 hover:text-white">
             <X className="w-5 h-5" />

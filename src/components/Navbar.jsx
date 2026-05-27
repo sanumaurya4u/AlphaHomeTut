@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, GraduationCap, ChevronDown } from 'lucide-react';
+import { Menu, X, ChevronDown } from 'lucide-react';
 
 const navLinks = [
   { name: 'Home', href: '#home', route: '/' },
@@ -92,13 +92,7 @@ export default function Navbar() {
             to="/"
             className="nav-link flex items-center gap-2 group"
           >
-            <div className="w-10 h-10 bg-secondary rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
-              <GraduationCap className="w-6 h-6 text-primary" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-white font-bold text-lg leading-tight">Alpha</span>
-              <span className="text-secondary text-xs font-semibold leading-tight tracking-wider">HOME TUITION</span>
-            </div>
+            <img src="/logo.png" alt="Alpha Home Tuition" className="h-12 w-auto object-contain group-hover:scale-105 transition-transform" />
           </Link>
 
           {/* Desktop Links */}

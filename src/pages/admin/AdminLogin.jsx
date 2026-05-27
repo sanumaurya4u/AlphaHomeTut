@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2, Shield } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { loginSchema } from '@/utils/validators';
 
@@ -69,11 +69,10 @@ export default function AdminLogin() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-              className="w-16 h-16 bg-gradient-to-br from-secondary to-secondary-dark rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-secondary/20"
+              className="mx-auto mb-4"
             >
-              <GraduationCap className="w-8 h-8 text-primary" />
+              <img src="/logo.png" alt="Alpha Home Tuition" className="h-20 w-auto object-contain mx-auto" />
             </motion.div>
-            <h1 className="text-2xl font-bold text-white mb-1">Alpha Home Tuition</h1>
             <p className="text-white/50 text-sm flex items-center justify-center gap-1.5">
               <Shield className="w-3.5 h-3.5" /> Admin Portal
             </p>
