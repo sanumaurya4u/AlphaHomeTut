@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Phone, Mail, MapPin, Send, Clock, Loader2 } from 'lucide-react';
 import { submitContactMessage } from '@/services/contactService';
 import { createNotification } from '@/services/notificationService';
+import { sendContactEmail } from '@/services/emailService';
 import { NOTIFICATION_TYPES } from '@/constants';
 
 export default function ContactSection() {
@@ -21,12 +22,17 @@ export default function ContactSection() {
     setLoading(true);
     try {
       await submitContactMessage(formData);
-      await createNotification({
-        type: NOTIFICATION_TYPES.NEW_CONTACT,
-        title: 'New Contact Message',
-        message: `New message from ${formData.name}`,
-        referenceType: 'contact',
-      });
+      await Promise.all([
+        createNotification({
+          type: NOTIFICATION_TYPES.NEW_CONTACT,
+          title: 'New Contact Message',
+          message: `New message from ${formData.name}`,
+          referenceType: 'contact',
+        }),
+        sendContactEmail(formData).catch((err) =>
+          console.error('EmailJS send failed:', err)
+        ),
+      ]);
       toast.success('Message sent successfully! We will get back to you soon.', { duration: 5000 });
       setFormData({ name: '', email: '', phone: '', message: '' });
     } catch (error) {
