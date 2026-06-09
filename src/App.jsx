@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
+import '@n8n/chat/style.css';
+import { createChat } from '@n8n/chat';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import WhatsAppButton from './components/WhatsAppButton';
@@ -55,6 +57,13 @@ function Layout({ children, hideNavFooter }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    createChat({
+      webhookUrl: 'https://sanumaurya4tech.app.n8n.cloud/webhook/37bd7585-f6cd-4f06-a30a-66fe7334511e/chat',
+      enableStreaming: true
+    });
+  }, []);
+
   return (
     <AuthProvider>
       <Toaster
