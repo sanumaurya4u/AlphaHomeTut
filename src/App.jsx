@@ -43,10 +43,25 @@ function Layout({ children, hideNavFooter }) {
 
 export default function App() {
   useEffect(() => {
-    createChat({
+    // Remove any existing n8n-chat container to avoid duplicates (React StrictMode double-mounts)
+    const existingChat = document.getElementById('n8n-chat');
+    if (existingChat) {
+      existingChat.remove();
+    }
+
+    const chatApp = createChat({
       webhookUrl: 'https://sanumaurya4tech.app.n8n.cloud/webhook/37bd7585-f6cd-4f06-a30a-66fe7334511e/chat',
-      enableStreaming: true
+      enableStreaming: false
     });
+
+    return () => {
+      // Cleanup on unmount
+      chatApp?.unmount?.();
+      const chatEl = document.getElementById('n8n-chat');
+      if (chatEl) {
+        chatEl.remove();
+      }
+    };
   }, []);
 
   return (

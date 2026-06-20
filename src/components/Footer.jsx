@@ -106,7 +106,6 @@ export default function Footer() {
                 <Phone className="w-4 h-4 text-secondary flex-shrink-0 mt-0.5" />
                 <div className="text-white/50 text-sm">
                   <p>7295948480</p>
-                  <p>9142283996</p>
                 </div>
               </li>
               <li className="flex items-start gap-3">
