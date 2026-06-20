@@ -86,8 +86,8 @@ src/
 
 ## Contact
 
-- **Phone:** 7484934920 / 9142283996
-- **Email:** info@alphahometuition.com
+- **Phone:** 7295948480
+- **Email:** alpha.hometuition4u@gmail.com
 
 ---
 

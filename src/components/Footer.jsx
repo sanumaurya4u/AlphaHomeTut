@@ -105,13 +105,13 @@ export default function Footer() {
               <li className="flex items-start gap-3">
                 <Phone className="w-4 h-4 text-secondary flex-shrink-0 mt-0.5" />
                 <div className="text-white/50 text-sm">
-                  <p>7484934920</p>
+                  <p>7295948480</p>
                   <p>9142283996</p>
                 </div>
               </li>
               <li className="flex items-start gap-3">
                 <Mail className="w-4 h-4 text-secondary flex-shrink-0 mt-0.5" />
-                <p className="text-white/50 text-sm">info@alphahometuition.com</p>
+                <p className="text-white/50 text-sm">alpha.hometuition4u@gmail.com</p>
               </li>
               <li className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 text-secondary flex-shrink-0 mt-0.5" />

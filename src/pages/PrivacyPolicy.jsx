@@ -137,7 +137,7 @@ export default function PrivacyPolicy() {
         <div className="mt-10 text-center">
           <p className="text-gray-400 text-sm">Last Updated: May 2025 | Effective immediately</p>
           <p className="text-gray-400 text-xs mt-2">
-            This privacy policy is governed by Indian laws. For queries, contact us at info@alphahometuition.com
+            This privacy policy is governed by Indian laws. For queries, contact us at <a href="mailto:alpha.hometuition4u@gmail.com" className="text-secondary hover:underline">alpha.hometuition4u@gmail.com</a>
           </p>
         </div>
       </div>

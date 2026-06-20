@@ -19,8 +19,8 @@ export default function ContactSection() {
   };
 
   const contactInfo = [
-    { icon: Phone, title: 'Call Us', lines: ['7484934920', '9142283996'] },
-    { icon: Mail, title: 'Email Us', lines: ['info@alphahometuition.com'] },
+    { icon: Phone, title: 'Call Us', lines: ['7295948480', '9142283996'] },
+    { icon: Mail, title: 'Email Us', lines: ['alpha.hometuition4u@gmail.com'] },
     { icon: MapPin, title: 'Address', lines: ['Alpha Home Tuition', 'Bihar, India'] },
     { icon: Clock, title: 'Hours', lines: ['Mon-Sat: 8AM - 9PM', 'Sun: 10AM - 6PM'] },
   ];
