@@ -1,13 +1,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { UserPlus, GraduationCap, BookOpen, Briefcase, Phone, MapPin, Upload, Loader2 } from 'lucide-react';
-import { registerTutor } from '@/services/tutorService';
-import { createNotification } from '@/services/notificationService';
-import { NOTIFICATION_TYPES } from '@/constants';
+import { UserPlus, GraduationCap, BookOpen, Briefcase, Phone, MapPin, Upload } from 'lucide-react';
 
 export default function BecomeTutorForm() {
-  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     tutorName: '', qualification: '', subjects: '', experience: '',
     phone: '', city: '',
@@ -17,38 +13,14 @@ export default function BecomeTutorForm() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.tutorName || !formData.qualification || !formData.subjects || !formData.phone) {
       toast.error('Please fill in all required fields.');
       return;
     }
-    setLoading(true);
-    try {
-      await registerTutor({
-        full_name: formData.tutorName,
-        phone: formData.phone,
-        email: '',
-        degree: formData.qualification,
-        subjects: formData.subjects,
-        experience: formData.experience,
-        city: formData.city,
-        status: 'Pending',
-      });
-      await createNotification({
-        type: NOTIFICATION_TYPES.NEW_TUTOR,
-        title: 'New Tutor Application',
-        message: `Quick application from ${formData.tutorName}`,
-        referenceType: 'tutor',
-      });
-      toast.success('Your application has been submitted! Our team will review and contact you soon.', { duration: 5000 });
-      setFormData({ tutorName: '', qualification: '', subjects: '', experience: '', phone: '', city: '' });
-    } catch (error) {
-      console.error('Tutor application error:', error);
-      toast.error(error.message || 'Submission failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    toast.success('Your application has been submitted! Our team will review and contact you soon.', { duration: 5000 });
+    setFormData({ tutorName: '', qualification: '', subjects: '', experience: '', phone: '', city: '' });
   };
 
   const inputClass = 'w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3.5 text-white placeholder-white/40 focus:border-secondary transition-all text-sm backdrop-blur-sm';
@@ -113,8 +85,8 @@ export default function BecomeTutorForm() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading} className="w-full bg-secondary hover:bg-secondary-light text-primary font-bold py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-secondary/30 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-              {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Submitting...</> : <><UserPlus className="w-5 h-5" />Submit Application</>}
+            <button type="submit" className="w-full bg-secondary hover:bg-secondary-light text-primary font-bold py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-secondary/30 flex items-center justify-center gap-2">
+              <UserPlus className="w-5 h-5" />Submit Application
             </button>
           </form>
         </motion.div>

@@ -9,85 +9,115 @@ export function AuthProvider({ children }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const checkAdminRole = async (userId) => {
+  /**
+   * Query the admin_users table to check if the given userId
+   * has an admin record. Returns the admin row or null.
+   */
+  const fetchAdminData = async (userId) => {
     try {
       const { data, error } = await supabase
         .from('admin_users')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error || !data) {
-        setIsAdmin(false);
-        setAdminData(null);
-        return false;
+      if (error) {
+        console.error('Error fetching admin data:', error.message);
+        return null;
       }
 
-      setIsAdmin(true);
-      setAdminData(data);
-      return true;
-    } catch {
-      setIsAdmin(false);
-      setAdminData(null);
-      return false;
+      return data;
+    } catch (err) {
+      console.error('fetchAdminData exception:', err);
+      return null;
     }
   };
 
+  /**
+   * Handle session changes — set user + admin state accordingly.
+   */
+  const handleSession = async (session) => {
+    if (session?.user) {
+      setUser(session.user);
+
+      const admin = await fetchAdminData(session.user.id);
+      if (admin) {
+        setAdminData(admin);
+        setIsAdmin(true);
+      } else {
+        setAdminData(null);
+        setIsAdmin(false);
+      }
+    } else {
+      setUser(null);
+      setAdminData(null);
+      setIsAdmin(false);
+    }
+
+    setLoading(false);
+  };
+
   useEffect(() => {
-    // Check existing session
-    const initAuth = async () => {
+    // 1. Check for an existing session on mount
+    const initSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          setUser(session.user);
-          await checkAdminRole(session.user.id);
-        }
+        await handleSession(session);
       } catch (err) {
-        console.error('Auth init error:', err);
-      } finally {
+        console.error('Error getting initial session:', err);
         setLoading(false);
       }
     };
 
-    initAuth();
+    initSession();
 
-    // Listen for auth state changes
+    // 2. Subscribe to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          setUser(session.user);
-          await checkAdminRole(session.user.id);
+        if (event === 'SIGNED_IN') {
+          await handleSession(session);
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
           setAdminData(null);
           setIsAdmin(false);
-        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          setUser(session.user);
+          setLoading(false);
         }
       }
     );
 
-    return () => subscription?.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Sign in with email and password.
+   * Returns the auth result from Supabase.
+   */
   const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
-    return data;
+    const result = await supabase.auth.signInWithPassword({ email, password });
+    return result;
   };
 
+  /**
+   * Sign out the current user.
+   */
   const logout = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setAdminData(null);
-    setIsAdmin(false);
+  };
+
+  const value = {
+    user,
+    adminData,
+    isAdmin,
+    loading,
+    login,
+    logout,
   };
 
   return (
-    <AuthContext.Provider value={{ user, adminData, isAdmin, loading, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
