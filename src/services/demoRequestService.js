@@ -1,21 +1,33 @@
-import { supabase } from '@/supabase/client';
+import { db } from '@/firebase/config';
+import {
+  collection,
+  doc,
+  addDoc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getCountFromServer,
+  serverTimestamp,
+  writeBatch,
+} from 'firebase/firestore';
 
 /**
  * Create a new demo request.
  */
 export async function createDemoRequest(data) {
   try {
-    const { data: result, error } = await supabase
-      .from('demo_requests')
-      .insert(data)
-      .select()
-      .single();
+    const docRef = await addDoc(collection(db, 'demo_requests'), {
+      ...data,
+      created_at: serverTimestamp(),
+    });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return result;
+    return { id: docRef.id, ...data };
   } catch (error) {
     console.error('createDemoRequest error:', error);
     throw error;
@@ -24,6 +36,7 @@ export async function createDemoRequest(data) {
 
 /**
  * Fetch demo requests with optional filtering, search, sorting, and pagination.
+ * Uses Firestore cursor-based pagination.
  */
 export async function getDemoRequests({
   search = '',
@@ -33,39 +46,63 @@ export async function getDemoRequests({
   pageSize = 10,
   sortBy = 'created_at',
   sortOrder = 'desc',
+  lastDoc = null,
 } = {}) {
   try {
-    const from = (page - 1) * pageSize;
-    const to = page * pageSize - 1;
-
-    let query = supabase
-      .from('demo_requests')
-      .select('*', { count: 'exact' });
+    const requestsRef = collection(db, 'demo_requests');
+    const constraints = [];
 
     if (status) {
-      query = query.eq('status', status);
+      constraints.push(where('status', '==', status));
     }
 
     if (mode) {
-      query = query.eq('mode', mode);
+      constraints.push(where('mode', '==', mode));
     }
 
+    constraints.push(orderBy(sortBy, sortOrder));
+    constraints.push(limit(pageSize));
+
+    if (lastDoc) {
+      constraints.push(startAfter(lastDoc));
+    }
+
+    const q = query(requestsRef, ...constraints);
+    const snapshot = await getDocs(q);
+
+    let data = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+
+    // Client-side search filtering on student_name, location
     if (search) {
-      query = query.or(
-        `student_name.ilike.%${search}%,location.ilike.%${search}%`
+      const searchLower = search.toLowerCase();
+      data = data.filter(
+        (req) =>
+          (req.student_name && req.student_name.toLowerCase().includes(searchLower)) ||
+          (req.location && req.location.toLowerCase().includes(searchLower))
       );
     }
 
-    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
-    query = query.range(from, to);
-
-    const { data, count, error } = await query;
-
-    if (error) {
-      throw new Error(error.message);
+    // Build count query with the same filters (excluding pagination)
+    const countConstraints = [];
+    if (status) {
+      countConstraints.push(where('status', '==', status));
+    }
+    if (mode) {
+      countConstraints.push(where('mode', '==', mode));
     }
 
-    return { data, count };
+    const countQuery = countConstraints.length > 0
+      ? query(requestsRef, ...countConstraints)
+      : requestsRef;
+    const countSnapshot = await getCountFromServer(countQuery);
+    const count = countSnapshot.data().count;
+
+    const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
+
+    return { data, count, lastDoc: lastVisible };
   } catch (error) {
     console.error('getDemoRequests error:', error);
     throw error;
@@ -77,17 +114,13 @@ export async function getDemoRequests({
  */
 export async function getDemoRequestById(id) {
   try {
-    const { data, error } = await supabase
-      .from('demo_requests')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const docSnap = await getDoc(doc(db, 'demo_requests', id));
 
-    if (error) {
-      throw new Error(error.message);
+    if (!docSnap.exists()) {
+      throw new Error('Demo request not found');
     }
 
-    return data;
+    return { id: docSnap.id, ...docSnap.data() };
   } catch (error) {
     console.error('getDemoRequestById error:', error);
     throw error;
@@ -99,18 +132,11 @@ export async function getDemoRequestById(id) {
  */
 export async function updateDemoRequestStatus(id, status) {
   try {
-    const { data, error } = await supabase
-      .from('demo_requests')
-      .update({ status })
-      .eq('id', id)
-      .select()
-      .single();
+    const requestRef = doc(db, 'demo_requests', id);
+    await updateDoc(requestRef, { status });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data;
+    const updatedSnap = await getDoc(requestRef);
+    return { id: updatedSnap.id, ...updatedSnap.data() };
   } catch (error) {
     console.error('updateDemoRequestStatus error:', error);
     throw error;
@@ -122,15 +148,7 @@ export async function updateDemoRequestStatus(id, status) {
  */
 export async function deleteDemoRequest(id) {
   try {
-    const { error } = await supabase
-      .from('demo_requests')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
+    await deleteDoc(doc(db, 'demo_requests', id));
     return true;
   } catch (error) {
     console.error('deleteDemoRequest error:', error);
@@ -143,25 +161,22 @@ export async function deleteDemoRequest(id) {
  */
 export async function getDemoRequestStats() {
   try {
+    const requestsRef = collection(db, 'demo_requests');
+
     const [total, pending, contacted, assigned, completed] = await Promise.all([
-      supabase.from('demo_requests').select('id', { count: 'exact', head: true }),
-      supabase.from('demo_requests').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
-      supabase.from('demo_requests').select('id', { count: 'exact', head: true }).eq('status', 'Contacted'),
-      supabase.from('demo_requests').select('id', { count: 'exact', head: true }).eq('status', 'Tutor Assigned'),
-      supabase.from('demo_requests').select('id', { count: 'exact', head: true }).eq('status', 'Completed'),
+      getCountFromServer(requestsRef),
+      getCountFromServer(query(requestsRef, where('status', '==', 'Pending'))),
+      getCountFromServer(query(requestsRef, where('status', '==', 'Contacted'))),
+      getCountFromServer(query(requestsRef, where('status', '==', 'Tutor Assigned'))),
+      getCountFromServer(query(requestsRef, where('status', '==', 'Completed'))),
     ]);
 
-    const errors = [total, pending, contacted, assigned, completed].filter(r => r.error);
-    if (errors.length > 0) {
-      throw new Error(errors[0].error.message);
-    }
-
     return {
-      total: total.count ?? 0,
-      pending: pending.count ?? 0,
-      contacted: contacted.count ?? 0,
-      assigned: assigned.count ?? 0,
-      completed: completed.count ?? 0,
+      total: total.data().count,
+      pending: pending.data().count,
+      contacted: contacted.data().count,
+      assigned: assigned.data().count,
+      completed: completed.data().count,
     };
   } catch (error) {
     console.error('getDemoRequestStats error:', error);
@@ -172,34 +187,30 @@ export async function getDemoRequestStats() {
 /**
  * Assign a tutor to a demo request.
  * Inserts into assigned_tutors and updates the demo request status to "Tutor Assigned".
+ * Uses a batch write for atomicity.
  */
 export async function assignTutorToRequest(requestId, tutorId, notes = '') {
   try {
-    const { data: assignment, error: assignError } = await supabase
-      .from('assigned_tutors')
-      .insert({
-        demo_request_id: requestId,
-        tutor_id: tutorId,
-        notes,
-        status: 'Assigned',
-      })
-      .select()
-      .single();
+    const batch = writeBatch(db);
 
-    if (assignError) {
-      throw new Error(assignError.message);
-    }
+    // Create a new document reference in assigned_tutors
+    const assignmentRef = doc(collection(db, 'assigned_tutors'));
+    const assignmentData = {
+      demo_request_id: requestId,
+      tutor_id: tutorId,
+      notes,
+      status: 'Assigned',
+      created_at: serverTimestamp(),
+    };
+    batch.set(assignmentRef, assignmentData);
 
-    const { error: updateError } = await supabase
-      .from('demo_requests')
-      .update({ status: 'Tutor Assigned' })
-      .eq('id', requestId);
+    // Update the demo request status
+    const requestRef = doc(db, 'demo_requests', requestId);
+    batch.update(requestRef, { status: 'Tutor Assigned' });
 
-    if (updateError) {
-      throw new Error(updateError.message);
-    }
+    await batch.commit();
 
-    return assignment;
+    return { id: assignmentRef.id, ...assignmentData };
   } catch (error) {
     console.error('assignTutorToRequest error:', error);
     throw error;

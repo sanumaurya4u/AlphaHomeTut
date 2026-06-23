@@ -8,8 +8,10 @@ import Footer from './components/Footer';
 import WhatsAppButton from './components/WhatsAppButton';
 import ScrollToTop from './components/ScrollToTop';
 import ScrollToTopOnNavigate from './components/ScrollToTopOnNavigate';
+import { AuthProvider } from './context/AuthContext';
 
 // Lazy load pages
+const PortalSelection = lazy(() => import('./pages/PortalSelection'));
 const HomePage = lazy(() => import('./pages/HomePage'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
@@ -17,6 +19,8 @@ const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
 const TutorRegistration = lazy(() => import('./pages/TutorRegistration'));
 const MembershipPlans = lazy(() => import('./pages/MembershipPlans'));
 const TutorDashboard = lazy(() => import('./pages/TutorDashboard'));
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 
 function PageLoader() {
   return (
@@ -65,7 +69,7 @@ export default function App() {
   }, []);
 
   return (
-    <>
+    <AuthProvider>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -89,15 +93,18 @@ export default function App() {
       <ScrollToTopOnNavigate />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<Layout><HomePage /></Layout>} />
+          <Route path="/" element={<PortalSelection />} />
+          <Route path="/home" element={<Layout><HomePage /></Layout>} />
           <Route path="/terms" element={<Layout><TermsAndConditions /></Layout>} />
           <Route path="/privacy" element={<Layout><PrivacyPolicy /></Layout>} />
           <Route path="/refund" element={<Layout><RefundPolicy /></Layout>} />
           <Route path="/register" element={<Layout><TutorRegistration /></Layout>} />
           <Route path="/membership" element={<Layout><MembershipPlans /></Layout>} />
           <Route path="/dashboard" element={<Layout hideNavFooter><TutorDashboard /></Layout>} />
+          <Route path="/admin/login" element={<Layout hideNavFooter><AdminLogin /></Layout>} />
+          <Route path="/admin/dashboard" element={<Layout hideNavFooter><AdminDashboard /></Layout>} />
         </Routes>
       </Suspense>
-    </>
+    </AuthProvider>
   );
 }

@@ -1,21 +1,32 @@
-import { supabase } from '@/supabase/client';
+import { db } from '@/firebase/config';
+import {
+  collection,
+  doc,
+  addDoc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getCountFromServer,
+  serverTimestamp,
+} from 'firebase/firestore';
 
 /**
  * Register a new tutor.
  */
 export async function registerTutor(data) {
   try {
-    const { data: tutor, error } = await supabase
-      .from('tutors')
-      .insert(data)
-      .select()
-      .single();
+    const docRef = await addDoc(collection(db, 'tutors'), {
+      ...data,
+      created_at: serverTimestamp(),
+    });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return tutor;
+    return { id: docRef.id, ...data };
   } catch (error) {
     console.error('registerTutor error:', error);
     throw error;
@@ -24,6 +35,7 @@ export async function registerTutor(data) {
 
 /**
  * Fetch tutors with optional filtering, search, sorting, and pagination.
+ * Uses Firestore cursor-based pagination.
  */
 export async function getTutors({
   search = '',
@@ -33,39 +45,64 @@ export async function getTutors({
   pageSize = 10,
   sortBy = 'created_at',
   sortOrder = 'desc',
+  lastDoc = null,
 } = {}) {
   try {
-    const from = (page - 1) * pageSize;
-    const to = page * pageSize - 1;
-
-    let query = supabase
-      .from('tutors')
-      .select('*', { count: 'exact' });
+    const tutorsRef = collection(db, 'tutors');
+    const constraints = [];
 
     if (status) {
-      query = query.eq('status', status);
+      constraints.push(where('status', '==', status));
     }
 
     if (qualification) {
-      query = query.eq('qualification', qualification);
+      constraints.push(where('qualification', '==', qualification));
     }
 
+    constraints.push(orderBy(sortBy, sortOrder));
+    constraints.push(limit(pageSize));
+
+    if (lastDoc) {
+      constraints.push(startAfter(lastDoc));
+    }
+
+    const q = query(tutorsRef, ...constraints);
+    const snapshot = await getDocs(q);
+
+    let data = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+
+    // Client-side search filtering on full_name, email, phone
     if (search) {
-      query = query.or(
-        `full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
+      const searchLower = search.toLowerCase();
+      data = data.filter(
+        (tutor) =>
+          (tutor.full_name && tutor.full_name.toLowerCase().includes(searchLower)) ||
+          (tutor.email && tutor.email.toLowerCase().includes(searchLower)) ||
+          (tutor.phone && tutor.phone.toLowerCase().includes(searchLower))
       );
     }
 
-    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
-    query = query.range(from, to);
-
-    const { data, count, error } = await query;
-
-    if (error) {
-      throw new Error(error.message);
+    // Build count query with the same filters (excluding pagination)
+    const countConstraints = [];
+    if (status) {
+      countConstraints.push(where('status', '==', status));
+    }
+    if (qualification) {
+      countConstraints.push(where('qualification', '==', qualification));
     }
 
-    return { data, count };
+    const countQuery = countConstraints.length > 0
+      ? query(tutorsRef, ...countConstraints)
+      : tutorsRef;
+    const countSnapshot = await getCountFromServer(countQuery);
+    const count = countSnapshot.data().count;
+
+    const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
+
+    return { data, count, lastDoc: lastVisible };
   } catch (error) {
     console.error('getTutors error:', error);
     throw error;
@@ -77,17 +114,28 @@ export async function getTutors({
  */
 export async function getTutorById(id) {
   try {
-    const { data, error } = await supabase
-      .from('tutors')
-      .select('*, tutor_documents(*)')
-      .eq('id', id)
-      .single();
+    const tutorSnap = await getDoc(doc(db, 'tutors', id));
 
-    if (error) {
-      throw new Error(error.message);
+    if (!tutorSnap.exists()) {
+      throw new Error('Tutor not found');
     }
 
-    return data;
+    // Fetch related tutor_documents
+    const docsQuery = query(
+      collection(db, 'tutor_documents'),
+      where('tutor_id', '==', id)
+    );
+    const docsSnapshot = await getDocs(docsQuery);
+    const tutor_documents = docsSnapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+
+    return {
+      id: tutorSnap.id,
+      ...tutorSnap.data(),
+      tutor_documents,
+    };
   } catch (error) {
     console.error('getTutorById error:', error);
     throw error;
@@ -99,18 +147,11 @@ export async function getTutorById(id) {
  */
 export async function updateTutorStatus(id, status) {
   try {
-    const { data, error } = await supabase
-      .from('tutors')
-      .update({ status })
-      .eq('id', id)
-      .select()
-      .single();
+    const tutorRef = doc(db, 'tutors', id);
+    await updateDoc(tutorRef, { status });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data;
+    const updatedSnap = await getDoc(tutorRef);
+    return { id: updatedSnap.id, ...updatedSnap.data() };
   } catch (error) {
     console.error('updateTutorStatus error:', error);
     throw error;
@@ -122,15 +163,7 @@ export async function updateTutorStatus(id, status) {
  */
 export async function deleteTutor(id) {
   try {
-    const { error } = await supabase
-      .from('tutors')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
+    await deleteDoc(doc(db, 'tutors', id));
     return true;
   } catch (error) {
     console.error('deleteTutor error:', error);
@@ -143,23 +176,20 @@ export async function deleteTutor(id) {
  */
 export async function getTutorStats() {
   try {
+    const tutorsRef = collection(db, 'tutors');
+
     const [total, pending, verified, rejected] = await Promise.all([
-      supabase.from('tutors').select('id', { count: 'exact', head: true }),
-      supabase.from('tutors').select('id', { count: 'exact', head: true }).eq('status', 'Pending'),
-      supabase.from('tutors').select('id', { count: 'exact', head: true }).eq('status', 'Verified'),
-      supabase.from('tutors').select('id', { count: 'exact', head: true }).eq('status', 'Rejected'),
+      getCountFromServer(tutorsRef),
+      getCountFromServer(query(tutorsRef, where('status', '==', 'Pending'))),
+      getCountFromServer(query(tutorsRef, where('status', '==', 'Verified'))),
+      getCountFromServer(query(tutorsRef, where('status', '==', 'Rejected'))),
     ]);
 
-    const errors = [total, pending, verified, rejected].filter(r => r.error);
-    if (errors.length > 0) {
-      throw new Error(errors[0].error.message);
-    }
-
     return {
-      total: total.count ?? 0,
-      pending: pending.count ?? 0,
-      verified: verified.count ?? 0,
-      rejected: rejected.count ?? 0,
+      total: total.data().count,
+      pending: pending.data().count,
+      verified: verified.data().count,
+      rejected: rejected.data().count,
     };
   } catch (error) {
     console.error('getTutorStats error:', error);
@@ -172,17 +202,25 @@ export async function getTutorStats() {
  */
 export async function getVerifiedTutors() {
   try {
-    const { data, error } = await supabase
-      .from('tutors')
-      .select('id, full_name, email, phone, subjects, qualification')
-      .eq('status', 'Verified')
-      .order('full_name', { ascending: true });
+    const q = query(
+      collection(db, 'tutors'),
+      where('status', '==', 'Verified'),
+      orderBy('full_name', 'asc')
+    );
 
-    if (error) {
-      throw new Error(error.message);
-    }
+    const snapshot = await getDocs(q);
 
-    return data;
+    return snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        full_name: data.full_name,
+        email: data.email,
+        phone: data.phone,
+        subjects: data.subjects,
+        qualification: data.qualification,
+      };
+    });
   } catch (error) {
     console.error('getVerifiedTutors error:', error);
     throw error;

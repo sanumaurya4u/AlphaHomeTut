@@ -1,21 +1,33 @@
-import { supabase } from '@/supabase/client';
+import { db } from '@/firebase/config';
+import {
+  collection,
+  doc,
+  addDoc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getCountFromServer,
+  serverTimestamp,
+} from 'firebase/firestore';
 
 /**
  * Submit a new contact message.
  */
 export async function submitContactMessage(data) {
   try {
-    const { data: message, error } = await supabase
-      .from('contact_messages')
-      .insert(data)
-      .select()
-      .single();
+    const docRef = await addDoc(collection(db, 'contact_messages'), {
+      ...data,
+      is_read: false,
+      created_at: serverTimestamp(),
+    });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return message;
+    return { id: docRef.id, ...data };
   } catch (error) {
     console.error('submitContactMessage error:', error);
     throw error;
@@ -32,35 +44,58 @@ export async function getContactMessages({
   pageSize = 10,
   sortBy = 'created_at',
   sortOrder = 'desc',
+  lastDoc = null,
 } = {}) {
   try {
-    const from = (page - 1) * pageSize;
-    const to = page * pageSize - 1;
-
-    let query = supabase
-      .from('contact_messages')
-      .select('*', { count: 'exact' });
+    const messagesRef = collection(db, 'contact_messages');
+    const constraints = [];
 
     if (isRead !== null && isRead !== undefined && isRead !== '') {
-      query = query.eq('is_read', isRead);
+      constraints.push(where('is_read', '==', isRead));
     }
 
+    constraints.push(orderBy(sortBy, sortOrder));
+    constraints.push(limit(pageSize));
+
+    if (lastDoc) {
+      constraints.push(startAfter(lastDoc));
+    }
+
+    const q = query(messagesRef, ...constraints);
+    const snapshot = await getDocs(q);
+
+    let data = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+
+    // Client-side search filtering on name, email, subject, message
     if (search) {
-      query = query.or(
-        `name.ilike.%${search}%,email.ilike.%${search}%,subject.ilike.%${search}%,message.ilike.%${search}%`
+      const searchLower = search.toLowerCase();
+      data = data.filter(
+        (msg) =>
+          (msg.name && msg.name.toLowerCase().includes(searchLower)) ||
+          (msg.email && msg.email.toLowerCase().includes(searchLower)) ||
+          (msg.subject && msg.subject.toLowerCase().includes(searchLower)) ||
+          (msg.message && msg.message.toLowerCase().includes(searchLower))
       );
     }
 
-    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
-    query = query.range(from, to);
-
-    const { data, count, error } = await query;
-
-    if (error) {
-      throw new Error(error.message);
+    // Count query with same filters (excluding pagination)
+    const countConstraints = [];
+    if (isRead !== null && isRead !== undefined && isRead !== '') {
+      countConstraints.push(where('is_read', '==', isRead));
     }
 
-    return { data, count };
+    const countQuery = countConstraints.length > 0
+      ? query(messagesRef, ...countConstraints)
+      : messagesRef;
+    const countSnapshot = await getCountFromServer(countQuery);
+    const count = countSnapshot.data().count;
+
+    const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
+
+    return { data, count, lastDoc: lastVisible };
   } catch (error) {
     console.error('getContactMessages error:', error);
     throw error;
@@ -72,18 +107,11 @@ export async function getContactMessages({
  */
 export async function markAsRead(id) {
   try {
-    const { data, error } = await supabase
-      .from('contact_messages')
-      .update({ is_read: true })
-      .eq('id', id)
-      .select()
-      .single();
+    const msgRef = doc(db, 'contact_messages', id);
+    await updateDoc(msgRef, { is_read: true });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data;
+    const updatedSnap = await getDoc(msgRef);
+    return { id: updatedSnap.id, ...updatedSnap.data() };
   } catch (error) {
     console.error('markAsRead error:', error);
     throw error;
@@ -95,15 +123,7 @@ export async function markAsRead(id) {
  */
 export async function deleteContactMessage(id) {
   try {
-    const { error } = await supabase
-      .from('contact_messages')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
+    await deleteDoc(doc(db, 'contact_messages', id));
     return true;
   } catch (error) {
     console.error('deleteContactMessage error:', error);
@@ -116,16 +136,12 @@ export async function deleteContactMessage(id) {
  */
 export async function getUnreadCount() {
   try {
-    const { count, error } = await supabase
-      .from('contact_messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_read', false);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return count ?? 0;
+    const q = query(
+      collection(db, 'contact_messages'),
+      where('is_read', '==', false)
+    );
+    const countSnapshot = await getCountFromServer(q);
+    return countSnapshot.data().count;
   } catch (error) {
     console.error('getUnreadCount error:', error);
     throw error;

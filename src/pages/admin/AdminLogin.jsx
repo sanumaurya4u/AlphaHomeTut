@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { GraduationCap, Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
-import { loginSchema } from '@/utils/validators';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function AdminLogin() {
@@ -13,18 +10,8 @@ export default function AdminLogin() {
   const { user, isAdmin, loading: authLoading, login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-  });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   // Auto-redirect if already logged in as admin
   useEffect(() => {
@@ -33,11 +20,16 @@ export default function AdminLogin() {
     }
   }, [authLoading, user, isAdmin, navigate]);
 
-  const onSubmit = async (data) => {
-    setIsSubmitting(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast.error('Please enter both email and password.');
+      return;
+    }
 
+    setIsSubmitting(true);
     try {
-      const { error } = await login(data.email, data.password);
+      const { error } = await login(email, password);
 
       if (error) {
         toast.error(error.message || 'Invalid email or password.');
@@ -88,7 +80,7 @@ export default function AdminLogin() {
             <p className="text-white/40 text-sm mt-1">Admin Portal</p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email Field */}
             <div>
               <label className="block text-white/70 font-medium text-sm mb-2">
@@ -98,14 +90,12 @@ export default function AdminLogin() {
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
                   type="email"
-                  {...register('email')}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@alphahometuition.com"
                   className="w-full bg-white/[0.06] border border-white/[0.12] rounded-xl pl-11 pr-4 py-3.5 text-white placeholder-white/25 focus:border-secondary/60 focus:outline-none transition-all text-sm"
                 />
               </div>
-              {errors.email && (
-                <p className="text-red-400 text-xs mt-1.5">{errors.email.message}</p>
-              )}
             </div>
 
             {/* Password Field */}
@@ -117,7 +107,8 @@ export default function AdminLogin() {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  {...register('password')}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className="w-full bg-white/[0.06] border border-white/[0.12] rounded-xl pl-11 pr-12 py-3.5 text-white placeholder-white/25 focus:border-secondary/60 focus:outline-none transition-all text-sm"
                 />
@@ -133,9 +124,6 @@ export default function AdminLogin() {
                   )}
                 </button>
               </div>
-              {errors.password && (
-                <p className="text-red-400 text-xs mt-1.5">{errors.password.message}</p>
-              )}
             </div>
 
             {/* Remember Me */}

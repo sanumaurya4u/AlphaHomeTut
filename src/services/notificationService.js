@@ -1,28 +1,38 @@
-import { supabase } from '@/supabase/client';
+import { db } from '@/firebase/config';
+import {
+  collection,
+  doc,
+  addDoc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getCountFromServer,
+  serverTimestamp,
+  writeBatch,
+} from 'firebase/firestore';
 
 /**
  * Create a new notification.
  */
 export async function createNotification({ type, title, message, referenceId, referenceType }) {
   try {
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({
-        type,
-        title,
-        message,
-        reference_id: referenceId,
-        reference_type: referenceType,
-        is_read: false,
-      })
-      .select()
-      .single();
+    const docRef = await addDoc(collection(db, 'notifications'), {
+      type,
+      title,
+      message,
+      reference_id: referenceId,
+      reference_type: referenceType,
+      is_read: false,
+      created_at: serverTimestamp(),
+    });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data;
+    const snap = await getDoc(docRef);
+    return { id: snap.id, ...snap.data() };
   } catch (error) {
     console.error('createNotification error:', error);
     throw error;
@@ -34,31 +44,39 @@ export async function createNotification({ type, title, message, referenceId, re
  */
 export async function getNotifications({
   unreadOnly = false,
-  page = 1,
   pageSize = 20,
+  lastDoc = null,
 } = {}) {
   try {
-    const from = (page - 1) * pageSize;
-    const to = page * pageSize - 1;
-
-    let query = supabase
-      .from('notifications')
-      .select('*', { count: 'exact' });
+    const constraints = [];
 
     if (unreadOnly) {
-      query = query.eq('is_read', false);
+      constraints.push(where('is_read', '==', false));
     }
 
-    query = query.order('created_at', { ascending: false });
-    query = query.range(from, to);
+    constraints.push(orderBy('created_at', 'desc'));
+    constraints.push(limit(pageSize));
 
-    const { data, count, error } = await query;
-
-    if (error) {
-      throw new Error(error.message);
+    if (lastDoc) {
+      constraints.push(startAfter(lastDoc));
     }
 
-    return { data, count };
+    const q = query(collection(db, 'notifications'), ...constraints);
+    const snapshot = await getDocs(q);
+
+    const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
+
+    // Get total count
+    const countConstraints = [];
+    if (unreadOnly) {
+      countConstraints.push(where('is_read', '==', false));
+    }
+    const countQuery = query(collection(db, 'notifications'), ...countConstraints);
+    const countSnap = await getCountFromServer(countQuery);
+    const count = countSnap.data().count;
+
+    return { data, count, lastDoc: lastVisible };
   } catch (error) {
     console.error('getNotifications error:', error);
     throw error;
@@ -70,18 +88,11 @@ export async function getNotifications({
  */
 export async function markAsRead(id) {
   try {
-    const { data, error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', id)
-      .select()
-      .single();
+    const docRef = doc(db, 'notifications', id);
+    await updateDoc(docRef, { is_read: true });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data;
+    const snap = await getDoc(docRef);
+    return { id: snap.id, ...snap.data() };
   } catch (error) {
     console.error('markAsRead error:', error);
     throw error;
@@ -93,17 +104,26 @@ export async function markAsRead(id) {
  */
 export async function markAllAsRead() {
   try {
-    const { data, error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('is_read', false)
-      .select();
+    const q = query(
+      collection(db, 'notifications'),
+      where('is_read', '==', false)
+    );
+    const snapshot = await getDocs(q);
 
-    if (error) {
-      throw new Error(error.message);
-    }
+    const batch = writeBatch(db);
+    snapshot.docs.forEach((d) => {
+      batch.update(d.ref, { is_read: true });
+    });
+    await batch.commit();
 
-    return data;
+    // Return updated docs
+    const updated = snapshot.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+      is_read: true,
+    }));
+
+    return updated;
   } catch (error) {
     console.error('markAllAsRead error:', error);
     throw error;
@@ -115,16 +135,12 @@ export async function markAllAsRead() {
  */
 export async function getUnreadCount() {
   try {
-    const { count, error } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_read', false);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return count ?? 0;
+    const q = query(
+      collection(db, 'notifications'),
+      where('is_read', '==', false)
+    );
+    const countSnap = await getCountFromServer(q);
+    return countSnap.data().count;
   } catch (error) {
     console.error('getUnreadCount error:', error);
     throw error;

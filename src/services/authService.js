@@ -1,29 +1,25 @@
-import { supabase } from '@/supabase/client';
+import { auth, db } from '@/firebase/config';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 /**
- * Sign in an admin user with email and password.
- * Verifies the user has an entry in the admin_users table after authentication.
+ * Login an admin user with email and password.
+ * Checks if the user is an authorized admin after authentication.
+ * Signs out and throws if not an admin.
+ * @param {string} email
+ * @param {string} password
+ * @returns {Promise<import('firebase/auth').UserCredential>}
  */
 export async function loginAdmin(email, password) {
   try {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError) {
-      throw new Error(authError.message);
-    }
-
-    const userId = authData.user.id;
-
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userId = userCredential.user.uid;
     const isAdmin = await isAdminUser(userId);
     if (!isAdmin) {
-      await supabase.auth.signOut();
+      await signOut(auth);
       throw new Error('Access denied. You are not an authorized admin.');
     }
-
-    return authData;
+    return userCredential;
   } catch (error) {
     console.error('loginAdmin error:', error);
     throw error;
@@ -31,16 +27,12 @@ export async function loginAdmin(email, password) {
 }
 
 /**
- * Sign out the current admin user.
+ * Logout the current admin user.
+ * @returns {Promise<boolean>}
  */
 export async function logoutAdmin() {
   try {
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
+    await signOut(auth);
     return true;
   } catch (error) {
     console.error('logoutAdmin error:', error);
@@ -49,17 +41,12 @@ export async function logoutAdmin() {
 }
 
 /**
- * Retrieve the current authentication session.
+ * Get the current authenticated user.
+ * @returns {import('firebase/auth').User | null}
  */
-export async function getCurrentSession() {
+export function getCurrentSession() {
   try {
-    const { data, error } = await supabase.auth.getSession();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data.session;
+    return auth.currentUser;
   } catch (error) {
     console.error('getCurrentSession error:', error);
     throw error;
@@ -67,21 +54,18 @@ export async function getCurrentSession() {
 }
 
 /**
- * Check whether the given userId exists in the admin_users table.
+ * Check if a user is an admin by querying the admin_users Firestore collection.
+ * @param {string} userId
+ * @returns {Promise<boolean>}
  */
 export async function isAdminUser(userId) {
   try {
-    const { data, error } = await supabase
-      .from('admin_users')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return !!data;
+    const q = query(
+      collection(db, 'admin_users'),
+      where('user_id', '==', userId)
+    );
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
   } catch (error) {
     console.error('isAdminUser error:', error);
     throw error;

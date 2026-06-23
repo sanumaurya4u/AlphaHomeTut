@@ -1,46 +1,50 @@
-import { supabase } from '@/supabase/client';
+import { db, storage } from '@/firebase/config';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import {
+  collection,
+  doc,
+  addDoc,
+  getDoc,
+  getDocs,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
+} from 'firebase/firestore';
 
 const BUCKET_NAME = 'tutor-documents';
 
 /**
- * Upload a document file to Supabase storage and record it in the tutor_documents table.
+ * Upload a document file to Firebase Cloud Storage and record it in the tutor_documents collection.
  */
 export async function uploadDocument(file, tutorId, documentType) {
   try {
     const timestamp = Date.now();
     const ext = file.name.split('.').pop();
-    const filePath = `${tutorId}/${documentType}_${timestamp}.${ext}`;
+    const filePath = `${BUCKET_NAME}/${tutorId}/${documentType}_${timestamp}.${ext}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+    const storageRef = ref(storage, filePath);
+    await uploadBytes(storageRef, file);
 
-    if (uploadError) {
-      throw new Error(`File upload failed: ${uploadError.message}`);
-    }
-
-    const { data: record, error: insertError } = await supabase
-      .from('tutor_documents')
-      .insert({
+    let docRef;
+    try {
+      docRef = await addDoc(collection(db, 'tutor_documents'), {
         tutor_id: tutorId,
         file_path: filePath,
         file_name: file.name,
         file_size: file.size,
         document_type: documentType,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      // Attempt to clean up the uploaded file if the DB insert fails
-      await supabase.storage.from(BUCKET_NAME).remove([filePath]);
+        created_at: serverTimestamp(),
+      });
+    } catch (insertError) {
+      // Clean up the uploaded file if the Firestore insert fails
+      await deleteObject(storageRef);
       throw new Error(`Document record creation failed: ${insertError.message}`);
     }
 
-    return record;
+    const snap = await getDoc(docRef);
+    return { id: snap.id, ...snap.data() };
   } catch (error) {
     console.error('uploadDocument error:', error);
     throw error;
@@ -48,19 +52,13 @@ export async function uploadDocument(file, tutorId, documentType) {
 }
 
 /**
- * Generate a signed URL for a stored document (valid for 1 hour).
+ * Get the download URL for a stored document.
  */
 export async function getDocumentUrl(filePath) {
   try {
-    const { data, error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .createSignedUrl(filePath, 3600);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data.signedUrl;
+    const storageRef = ref(storage, filePath);
+    const url = await getDownloadURL(storageRef);
+    return url;
   } catch (error) {
     console.error('getDocumentUrl error:', error);
     throw error;
@@ -68,26 +66,15 @@ export async function getDocumentUrl(filePath) {
 }
 
 /**
- * Delete a document from both Supabase storage and the tutor_documents table.
+ * Delete a document from both Firebase Cloud Storage and the tutor_documents collection.
  */
 export async function deleteDocument(id, filePath) {
   try {
-    const { error: storageError } = await supabase.storage
-      .from(BUCKET_NAME)
-      .remove([filePath]);
+    const storageRef = ref(storage, filePath);
+    await deleteObject(storageRef);
 
-    if (storageError) {
-      throw new Error(`Storage deletion failed: ${storageError.message}`);
-    }
-
-    const { error: dbError } = await supabase
-      .from('tutor_documents')
-      .delete()
-      .eq('id', id);
-
-    if (dbError) {
-      throw new Error(`Document record deletion failed: ${dbError.message}`);
-    }
+    const docRef = doc(db, 'tutor_documents', id);
+    await deleteDoc(docRef);
 
     return true;
   } catch (error) {
@@ -101,17 +88,14 @@ export async function deleteDocument(id, filePath) {
  */
 export async function getDocumentsByTutor(tutorId) {
   try {
-    const { data, error } = await supabase
-      .from('tutor_documents')
-      .select('*')
-      .eq('tutor_id', tutorId)
-      .order('created_at', { ascending: false });
+    const q = query(
+      collection(db, 'tutor_documents'),
+      where('tutor_id', '==', tutorId),
+      orderBy('created_at', 'desc')
+    );
+    const snapshot = await getDocs(q);
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return data;
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   } catch (error) {
     console.error('getDocumentsByTutor error:', error);
     throw error;

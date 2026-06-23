@@ -90,9 +90,9 @@ export default function Navbar() {
           {/* Logo */}
           <Link
             to="/"
-            className="nav-link flex items-center gap-2 group"
+            className="nav-link flex items-center gap-2 group bg-white rounded-xl py-1 px-3 shadow-md border border-white/20 transition-all hover:shadow-lg hover:scale-[1.02]"
           >
-            <img src="/logo.png" alt="Alpha Home Tuition" className="h-12 w-auto object-contain group-hover:scale-105 transition-transform" />
+            <img src="/logo.png" alt="Alpha Home Tuition" className="h-10 md:h-12 w-auto object-contain" />
           </Link>
 
           {/* Desktop Links */}

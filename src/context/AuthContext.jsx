@@ -1,5 +1,7 @@
 import { createContext, useState, useEffect } from 'react';
-import { supabase } from '@/supabase/client';
+import { auth, db } from '@/firebase/config';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export const AuthContext = createContext(null);
 
@@ -10,23 +12,23 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   /**
-   * Query the admin_users table to check if the given userId
+   * Query the admin_users Firestore collection to check if the given userId
    * has an admin record. Returns the admin row or null.
    */
   const fetchAdminData = async (userId) => {
     try {
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+      const q = query(
+        collection(db, 'admin_users'),
+        where('user_id', '==', userId)
+      );
+      const snapshot = await getDocs(q);
 
-      if (error) {
-        console.error('Error fetching admin data:', error.message);
+      if (snapshot.empty) {
         return null;
       }
 
-      return data;
+      const docSnap = snapshot.docs[0];
+      return { id: docSnap.id, ...docSnap.data() };
     } catch (err) {
       console.error('fetchAdminData exception:', err);
       return null;
@@ -34,13 +36,13 @@ export function AuthProvider({ children }) {
   };
 
   /**
-   * Handle session changes — set user + admin state accordingly.
+   * Handle auth state changes — set user + admin state accordingly.
    */
-  const handleSession = async (session) => {
-    if (session?.user) {
-      setUser(session.user);
+  const handleUser = async (firebaseUser) => {
+    if (firebaseUser) {
+      setUser(firebaseUser);
 
-      const admin = await fetchAdminData(session.user.id);
+      const admin = await fetchAdminData(firebaseUser.uid);
       if (admin) {
         setAdminData(admin);
         setIsAdmin(true);
@@ -58,45 +60,23 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    // 1. Check for an existing session on mount
-    const initSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        await handleSession(session);
-      } catch (err) {
-        console.error('Error getting initial session:', err);
-        setLoading(false);
-      }
-    };
-
-    initSession();
-
-    // 2. Subscribe to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN') {
-          await handleSession(session);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setAdminData(null);
-          setIsAdmin(false);
-          setLoading(false);
-        }
-      }
-    );
+    // Subscribe to Firebase auth state changes
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      await handleUser(firebaseUser);
+    });
 
     return () => {
-      subscription.unsubscribe();
+      unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
    * Sign in with email and password.
-   * Returns the auth result from Supabase.
+   * Returns the UserCredential from Firebase Auth.
    */
   const login = async (email, password) => {
-    const result = await supabase.auth.signInWithPassword({ email, password });
+    const result = await signInWithEmailAndPassword(auth, email, password);
     return result;
   };
 
@@ -104,7 +84,7 @@ export function AuthProvider({ children }) {
    * Sign out the current user.
    */
   const logout = async () => {
-    await supabase.auth.signOut();
+    await firebaseSignOut(auth);
   };
 
   const value = {
