@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { Phone, Mail, MapPin, Send, Clock, Loader2 } from 'lucide-react';
 import { sendContactEmail } from '../services/emailService';
+import { submitContactMessage } from '@/services/contactService';
 
 export default function ContactSection() {
   const [loading, setLoading] = useState(false);
@@ -18,11 +19,21 @@ export default function ContactSection() {
     }
     setLoading(true);
     try {
-      await sendContactEmail(formData);
+      // Save to Firestore + send email in parallel
+      await Promise.all([
+        submitContactMessage({
+          name: formData.name,
+          email: formData.email || null,
+          phone: formData.phone || null,
+          subject: 'Contact Form Inquiry',
+          message: formData.message,
+        }),
+        sendContactEmail(formData),
+      ]);
       toast.success('Message sent successfully! We will get back to you soon.', { duration: 5000 });
       setFormData({ name: '', email: '', phone: '', message: '' });
     } catch (error) {
-      console.error('EmailJS send error:', error);
+      console.error('Contact form error:', error);
       toast.error(error.message || 'Failed to send message. Please try again.');
     } finally {
       setLoading(false);

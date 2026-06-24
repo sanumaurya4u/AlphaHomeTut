@@ -5,8 +5,9 @@ import toast from 'react-hot-toast';
 import {
   User, Phone, Mail, MapPin, BookOpen, GraduationCap, Briefcase,
   Upload, Camera, CreditCard, FileText, Shield, Crown, CheckCircle2,
-  ArrowLeft, ArrowRight, Sparkles, ChevronRight
+  ArrowLeft, ArrowRight, Sparkles, ChevronRight, Loader2
 } from 'lucide-react';
+import { registerTutor } from '@/services/tutorService';
 
 const stepTitles = [
   { title: 'Personal Details', icon: User },
@@ -20,6 +21,7 @@ const stepTitles = [
 export default function TutorRegistration() {
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '', phone: '', email: '', address: '', city: '', gender: '',
     tenthMarks: '', twelfthMarks: '', degree: '', college: '', subjects: '',
@@ -91,10 +93,38 @@ export default function TutorRegistration() {
     if (step > 0) setStep(step - 1);
   };
 
-  const handleSubmit = () => {
-    if (validateStep()) {
+  const handleSubmit = async () => {
+    if (!validateStep()) return;
+
+    setIsSubmitting(true);
+    try {
+      await registerTutor({
+        full_name: formData.fullName,
+        phone: formData.phone,
+        email: formData.email,
+        address: formData.address || null,
+        city: formData.city,
+        gender: formData.gender,
+        tenth_marks: formData.tenthMarks,
+        twelfth_marks: formData.twelfthMarks,
+        degree: formData.degree,
+        college: formData.college || null,
+        subjects: formData.subjects,
+        experience: formData.experience,
+        preferred_classes: formData.preferredClasses,
+        preferred_subjects: formData.preferredSubjects,
+        expected_salary: formData.expectedSalary || null,
+        membership: formData.membership,
+        qualification: formData.degree,
+        status: 'Pending',
+      });
       setSubmitted(true);
       toast.success('Registration submitted successfully! Our team will review your application.', { duration: 6000 });
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -453,9 +483,10 @@ export default function TutorRegistration() {
             ) : (
               <button
                 onClick={handleSubmit}
-                className="flex items-center gap-2 bg-secondary hover:bg-secondary-light text-primary font-bold px-8 py-3 rounded-xl text-sm transition-all hover:shadow-lg hover:shadow-secondary/30 pulse-glow"
+                disabled={isSubmitting}
+                className="flex items-center gap-2 bg-secondary hover:bg-secondary-light text-primary font-bold px-8 py-3 rounded-xl text-sm transition-all hover:shadow-lg hover:shadow-secondary/30 pulse-glow disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Sparkles className="w-4 h-4" /> Submit Registration
+                {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : <><Sparkles className="w-4 h-4" /> Submit Registration</>}
               </button>
             )}
           </div>
