@@ -4,12 +4,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ChevronDown } from 'lucide-react';
 
 const navLinks = [
-  { name: 'Home', href: '#home', route: '/' },
-  { name: 'About', href: '#about', route: '/#about' },
-  { name: 'Services', href: '#services', route: '/#services' },
-  { name: 'Find Tutor', href: '#find-tutor', route: '/#find-tutor' },
-  { name: 'Become Tutor', href: '#become-tutor', route: '/#become-tutor' },
-  { name: 'Contact', href: '#contact', route: '/#contact' },
+  { name: 'Home', href: '#home', route: '/home' },
+  { name: 'About', href: '#about', route: '/home#about' },
+  { name: 'Services', href: '#services', route: '/home#services' },
+  { name: 'Find Tutor', href: '#find-tutor', route: '/home#find-tutor' },
+  { name: 'Become Tutor', href: '#become-tutor', route: '/home#become-tutor' },
+  { name: 'Contact', href: '#contact', route: '/home#contact' },
 ];
 
 const legalLinks = [
@@ -24,7 +24,7 @@ export default function Navbar() {
   const [legalOpen, setLegalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const isHome = location.pathname === '/';
+  const isHome = location.pathname === '/home';
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -51,7 +51,7 @@ export default function Navbar() {
     if (isHome) {
       document.querySelector('#find-tutor')?.scrollIntoView({ behavior: 'smooth' });
     } else {
-      navigate('/#find-tutor');
+      navigate('/home#find-tutor');
     }
   }, [isHome, navigate]);
 
@@ -89,7 +89,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <Link
-            to="/"
+            to="/home"
             className="nav-link flex items-center gap-2 group bg-white rounded-xl py-1 px-3 shadow-md border border-white/20 transition-all hover:shadow-lg hover:scale-[1.02]"
           >
             <img src="/logo.png" alt="Alpha Home Tuition" className="h-10 md:h-12 w-auto object-contain" />

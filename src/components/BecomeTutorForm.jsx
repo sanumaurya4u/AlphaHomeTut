@@ -1,26 +1,60 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { UserPlus, GraduationCap, BookOpen, Briefcase, Phone, MapPin, Upload } from 'lucide-react';
+import { UserPlus, GraduationCap, BookOpen, Briefcase, Phone, MapPin, Upload, Loader2 } from 'lucide-react';
+import { registerTutor } from '@/services/tutorService';
+import { uploadDocument } from '@/services/uploadService';
 
 export default function BecomeTutorForm() {
   const [formData, setFormData] = useState({
     tutorName: '', qualification: '', subjects: '', experience: '',
     phone: '', city: '',
   });
+  const [resumeFile, setResumeFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setResumeFile(e.target.files[0]);
+    }
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.tutorName || !formData.qualification || !formData.subjects || !formData.phone) {
       toast.error('Please fill in all required fields.');
       return;
     }
-    toast.success('Your application has been submitted! Our team will review and contact you soon.', { duration: 5000 });
-    setFormData({ tutorName: '', qualification: '', subjects: '', experience: '', phone: '', city: '' });
+
+    setIsSubmitting(true);
+    try {
+      const tutorData = await registerTutor({
+        full_name: formData.tutorName,
+        qualification: formData.qualification,
+        subjects: formData.subjects,
+        experience: formData.experience || null,
+        phone: formData.phone,
+        city: formData.city || null,
+        status: 'Pending'
+      });
+
+      if (resumeFile) {
+        await uploadDocument(resumeFile, tutorData.id, 'Resume');
+      }
+
+      toast.success('Your application has been submitted! Our team will review and contact you soon.', { duration: 5000 });
+      setFormData({ tutorName: '', qualification: '', subjects: '', experience: '', phone: '', city: '' });
+      setResumeFile(null);
+    } catch (error) {
+      console.error('Submission error:', error);
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const inputClass = 'w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3.5 text-white placeholder-white/40 focus:border-secondary transition-all text-sm backdrop-blur-sm';
@@ -78,15 +112,22 @@ export default function BecomeTutorForm() {
 
             <div>
               <label className={labelClass}><Upload className="w-4 h-4 inline mr-1" />Upload Resume</label>
-              <div className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center hover:border-secondary/50 transition-colors cursor-pointer">
+              <label className="border-2 border-dashed border-white/20 rounded-xl p-6 text-center hover:border-secondary/50 transition-colors cursor-pointer block relative">
+                <input type="file" accept=".pdf,.doc,.docx" onChange={handleFileChange} className="hidden" />
                 <Upload className="w-8 h-8 text-white/40 mx-auto mb-2" />
-                <p className="text-white/50 text-sm">Click to upload or drag and drop</p>
-                <p className="text-white/30 text-xs mt-1">PDF, DOC up to 5MB</p>
-              </div>
+                {resumeFile ? (
+                  <p className="text-secondary text-sm font-medium truncate">{resumeFile.name}</p>
+                ) : (
+                  <>
+                    <p className="text-white/50 text-sm">Click to upload or drag and drop</p>
+                    <p className="text-white/30 text-xs mt-1">PDF, DOC up to 5MB</p>
+                  </>
+                )}
+              </label>
             </div>
 
-            <button type="submit" className="w-full bg-secondary hover:bg-secondary-light text-primary font-bold py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-secondary/30 flex items-center justify-center gap-2">
-              <UserPlus className="w-5 h-5" />Submit Application
+            <button type="submit" disabled={isSubmitting} className="w-full bg-secondary hover:bg-secondary-light text-primary font-bold py-4 rounded-xl text-base transition-all hover:shadow-lg hover:shadow-secondary/30 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+              {isSubmitting ? <><Loader2 className="w-5 h-5 animate-spin" /> Submitting...</> : <><UserPlus className="w-5 h-5" />Submit Application</>}
             </button>
           </form>
         </motion.div>

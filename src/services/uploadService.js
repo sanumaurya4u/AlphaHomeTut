@@ -25,7 +25,14 @@ export async function uploadDocument(file, tutorId, documentType) {
     const filePath = `${BUCKET_NAME}/${tutorId}/${documentType}_${timestamp}.${ext}`;
 
     const storageRef = ref(storage, filePath);
-    await uploadBytes(storageRef, file);
+    
+    // Add a timeout to prevent infinite hang if Storage isn't enabled
+    const uploadPromise = uploadBytes(storageRef, file);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Upload timed out. Have you enabled Firebase Storage in your Firebase Console?')), 15000);
+    });
+    
+    await Promise.race([uploadPromise, timeoutPromise]);
 
     let docRef;
     try {
