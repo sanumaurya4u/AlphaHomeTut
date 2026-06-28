@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ChevronDown } from 'lucide-react';
+import { Menu, X, ChevronDown, GraduationCap } from 'lucide-react';
 
 const navLinks = [
-  { name: 'Home', href: '#home', route: '/home' },
-  { name: 'About', href: '#about', route: '/home#about' },
-  { name: 'Services', href: '#services', route: '/home#services' },
-  { name: 'Find Tutor', href: '#find-tutor', route: '/home#find-tutor' },
-  { name: 'Become Tutor', href: '#become-tutor', route: '/home#become-tutor' },
-  { name: 'Contact', href: '#contact', route: '/home#contact' },
+  { name: 'Home', href: '#home', route: '/' },
+  { name: 'About', href: '#about', route: '/#about' },
+  { name: 'Services', href: '#services', route: '/#services' },
+  { name: 'Find Tutor', href: '#find-tutor', route: '/#find-tutor' },
+  { name: 'Become Tutor', href: '#become-tutor', route: '/#become-tutor' },
+  { name: 'Contact', href: '#contact', route: '/#contact' },
 ];
 
 const legalLinks = [
@@ -24,7 +24,7 @@ export default function Navbar() {
   const [legalOpen, setLegalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const isHome = location.pathname === '/home';
+  const isHome = location.pathname === '/';
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -51,7 +51,7 @@ export default function Navbar() {
     if (isHome) {
       document.querySelector('#find-tutor')?.scrollIntoView({ behavior: 'smooth' });
     } else {
-      navigate('/home#find-tutor');
+      navigate('/#find-tutor');
     }
   }, [isHome, navigate]);
 
@@ -90,9 +90,15 @@ export default function Navbar() {
           {/* Logo */}
           <Link
             to="/home"
-            className="nav-link flex items-center gap-2 group bg-white rounded-xl py-1 px-3 shadow-md border border-white/20 transition-all hover:shadow-lg hover:scale-[1.02]"
+            className="nav-link flex items-center gap-2 group bg-white/10 rounded-xl py-2 px-4 backdrop-blur-sm border border-white/20 transition-all hover:bg-white/20 hover:scale-[1.02]"
           >
-            <img src="/logo.png" alt="Alpha Home Tuition" className="h-10 md:h-12 w-auto object-contain" />
+            <div className="bg-secondary p-1.5 rounded-lg">
+              <GraduationCap className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xl font-bold text-white leading-none tracking-tight">Alpha<span className="text-secondary">Home</span>Tut</span>
+              <span className="text-[10px] text-white/70 font-medium uppercase tracking-widest mt-0.5">Education Portal</span>
+            </div>
           </Link>
 
           {/* Desktop Links */}
