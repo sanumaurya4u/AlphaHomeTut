@@ -4,12 +4,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ChevronDown, GraduationCap } from 'lucide-react';
 
 const navLinks = [
-  { name: 'Home', href: '#home', route: '/' },
-  { name: 'About', href: '#about', route: '/#about' },
-  { name: 'Services', href: '#services', route: '/#services' },
-  { name: 'Find Tutor', href: '#find-tutor', route: '/#find-tutor' },
-  { name: 'Become Tutor', href: '#become-tutor', route: '/#become-tutor' },
-  { name: 'Contact', href: '#contact', route: '/#contact' },
+  { name: 'Home', href: '#home', route: '/home' },
+  { name: 'About', href: '#about', route: '/home#about' },
+  { name: 'Services', href: '#services', route: '/home#services' },
+  { name: 'Find Tutor', href: '#find-tutor', route: '/home#find-tutor' },
+  { name: 'Become Tutor', href: '#become-tutor', route: '/home#become-tutor' },
+  { name: 'Contact', href: '#contact', route: '/home#contact' },
 ];
 
 const legalLinks = [
@@ -24,7 +24,7 @@ export default function Navbar() {
   const [legalOpen, setLegalOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const isHome = location.pathname === '/';
+  const isHome = location.pathname === '/home';
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -51,7 +51,7 @@ export default function Navbar() {
     if (isHome) {
       document.querySelector('#find-tutor')?.scrollIntoView({ behavior: 'smooth' });
     } else {
-      navigate('/#find-tutor');
+      navigate('/home#find-tutor');
     }
   }, [isHome, navigate]);
 
