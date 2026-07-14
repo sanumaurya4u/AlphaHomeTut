@@ -1,15 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { UserPlus, GraduationCap, BookOpen, Briefcase, Phone, MapPin, Upload, Loader2 } from 'lucide-react';
 import { registerTutor } from '@/services/tutorService';
 import { uploadDocument } from '@/services/uploadService';
+import { useAuth } from '@/context/AuthContext';
+import AuthModal from './AuthModal';
 
-export default function BecomeTutorForm() {
+export default function BecomeTutorForm({ onSuccess }) {
+  const { user, profile } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    tutorName: '', qualification: '', subjects: '', experience: '',
+    tutorName: profile?.full_name || '', qualification: '', subjects: '', experience: '',
     phone: '', city: '',
   });
+
+  useEffect(() => {
+    if (profile?.full_name) {
+      setFormData(prev => ({ ...prev, tutorName: profile.full_name }));
+    }
+  }, [profile]);
   const [resumeFile, setResumeFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -25,6 +35,12 @@ export default function BecomeTutorForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!user) {
+      toast.error('Please log in or sign up to become a tutor.');
+      setIsAuthModalOpen(true);
+      return;
+    }
+
     if (!formData.tutorName || !formData.qualification || !formData.subjects || !formData.phone) {
       toast.error('Please fill in all required fields.');
       return;
@@ -34,6 +50,8 @@ export default function BecomeTutorForm() {
     try {
       const tutorData = await registerTutor({
         full_name: formData.tutorName,
+        email: user?.email, // Bind the tutor to the logged in user's email
+        profile_id: user?.id, // Ensure profile_id is linked to auth immediately
         qualification: formData.qualification,
         subjects: formData.subjects,
         experience: formData.experience || null,
@@ -49,6 +67,7 @@ export default function BecomeTutorForm() {
       toast.success('Your application has been submitted! Our team will review and contact you soon.', { duration: 5000 });
       setFormData({ tutorName: '', qualification: '', subjects: '', experience: '', phone: '', city: '' });
       setResumeFile(null);
+      if (onSuccess) onSuccess(tutorData);
     } catch (error) {
       console.error('Submission error:', error);
       toast.error('Something went wrong. Please try again.');
@@ -132,6 +151,13 @@ export default function BecomeTutorForm() {
           </form>
         </motion.div>
       </div>
+      
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+        onSuccess={() => toast.success('Now you can submit your application!')}
+        role="tutor"
+      />
     </section>
   );
 }

@@ -29,7 +29,29 @@ const socialLinks = [
   { icon: Play, href: '#', label: 'YouTube' },
 ];
 
-export default function Footer() {
+export default function Footer({ hideTutorOptions = false, hideStudentOptions = false, isDashboard = false }) {
+  let filteredQuickLinks = quickLinks;
+  if (hideTutorOptions) {
+    filteredQuickLinks = quickLinks.filter((link) => link.name !== 'Become Tutor');
+  } else if (hideStudentOptions) {
+    filteredQuickLinks = quickLinks.filter((link) => link.name !== 'Find Tutor' && link.name !== 'Become Tutor');
+  }
+
+  const getRoute = (originalRoute) => {
+    if (!isDashboard) return originalRoute;
+    if (originalRoute.includes('about')) return '?tab=about';
+    if (originalRoute.includes('services')) return '?tab=services';
+    if (originalRoute.includes('contact')) return '?tab=contact';
+    if (originalRoute.includes('terms')) return '?tab=terms';
+    if (originalRoute.includes('privacy')) return '?tab=privacy';
+    if (originalRoute.includes('refund')) return '?tab=refund';
+    if (originalRoute.includes('membership')) return '?tab=membership';
+    if (originalRoute.includes('dashboard')) return '?tab=profile';
+    if (originalRoute.includes('register')) return '?tab=profile';
+    if (originalRoute === '/') return '?tab=profile'; 
+    return originalRoute;
+  };
+
   return (
     <footer className="bg-primary-dark text-white relative overflow-hidden">
       <div className="absolute inset-0">
@@ -41,8 +63,8 @@ export default function Footer() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10 py-16">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <img src="/logo.png" alt="Alpha Home Tuition" className="h-14 w-auto object-contain" />
+            <Link to="/" className="flex items-center gap-2 mb-4 hover:opacity-85 transition-opacity">
+              <img src="/AHT-logo.svg" alt="Alpha Home Tuition" className="h-14 w-auto object-contain rounded-xl" />
             </Link>
             <p className="text-white/50 text-sm leading-relaxed mb-6">
               Connecting students with verified tutors for personalized learning at home. Quality education at your doorstep.
@@ -60,9 +82,9 @@ export default function Footer() {
           <div>
             <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">Quick Links</h3>
             <ul className="space-y-3">
-              {quickLinks.map((link, i) => (
+              {filteredQuickLinks.map((link, i) => (
                 <li key={i}>
-                  <Link to={link.route} className="text-white/50 hover:text-secondary text-sm flex items-center gap-2 transition-colors group">
+                  <Link to={getRoute(link.route)} className="text-white/50 hover:text-secondary text-sm flex items-center gap-2 transition-colors group">
                     <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                     {link.name}
                   </Link>
@@ -73,23 +95,27 @@ export default function Footer() {
 
           {/* For Tutors */}
           <div>
-            <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">For Tutors</h3>
-            <ul className="space-y-3">
-              {tutorLinks.map((link, i) => (
-                <li key={i}>
-                  <Link to={link.route} className="text-white/50 hover:text-secondary text-sm flex items-center gap-2 transition-colors group">
-                    <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {!hideTutorOptions && (
+              <>
+                <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">For Tutors</h3>
+                <ul className="space-y-3 mb-8">
+                  {tutorLinks.map((link, i) => (
+                    <li key={i}>
+                      <Link to={getRoute(link.route)} className="text-white/50 hover:text-secondary text-sm flex items-center gap-2 transition-colors group">
+                        <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                        {link.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
 
-            <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider mt-8">Legal</h3>
+            <h3 className="font-bold text-white mb-4 text-sm uppercase tracking-wider">Legal</h3>
             <ul className="space-y-3">
               {legalLinks.map((link, i) => (
                 <li key={i}>
-                  <Link to={link.route} className="text-white/50 hover:text-secondary text-sm flex items-center gap-2 transition-colors group">
+                  <Link to={getRoute(link.route)} className="text-white/50 hover:text-secondary text-sm flex items-center gap-2 transition-colors group">
                     <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                     {link.name}
                   </Link>
@@ -135,9 +161,9 @@ export default function Footer() {
             &copy; {new Date().getFullYear()} Alpha Home Tuition Pvt. Ltd. All Rights Reserved.
           </p>
           <div className="flex items-center gap-4">
-            <Link to="/terms" className="text-white/30 hover:text-white/60 text-xs transition-colors">Terms</Link>
-            <Link to="/privacy" className="text-white/30 hover:text-white/60 text-xs transition-colors">Privacy</Link>
-            <Link to="/refund" className="text-white/30 hover:text-white/60 text-xs transition-colors">Refund</Link>
+            <Link to={getRoute("/terms")} className="text-white/30 hover:text-white/60 text-xs transition-colors">Terms</Link>
+            <Link to={getRoute("/privacy")} className="text-white/30 hover:text-white/60 text-xs transition-colors">Privacy</Link>
+            <Link to={getRoute("/refund")} className="text-white/30 hover:text-white/60 text-xs transition-colors">Refund</Link>
           </div>
           <p className="text-white/30 text-xs">
             From Learning to Leading...

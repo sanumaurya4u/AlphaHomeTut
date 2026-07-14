@@ -1,148 +1,57 @@
-import { db } from '@/firebase/config';
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  startAfter,
-  getCountFromServer,
-  serverTimestamp,
-  writeBatch,
-} from 'firebase/firestore';
+import { supabase } from '@/supabase/config';
 
-/**
- * Create a new notification.
- */
 export async function createNotification({ type, title, message, referenceId, referenceType }) {
-  try {
-    const docRef = await addDoc(collection(db, 'notifications'), {
-      type,
-      title,
-      message,
-      reference_id: referenceId,
-      reference_type: referenceType,
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert([{
+      type, title, message,
       is_read: false,
-      created_at: serverTimestamp(),
-    });
-
-    const snap = await getDoc(docRef);
-    return { id: snap.id, ...snap.data() };
-  } catch (error) {
-    console.error('createNotification error:', error);
-    throw error;
-  }
+    }])
+    .select()
+    .single();
+  if (error) { console.error('createNotification error:', error); throw error; }
+  return data;
 }
 
-/**
- * Fetch notifications with optional unread-only filter and pagination.
- */
 export async function getNotifications({
-  unreadOnly = false,
-  pageSize = 20,
-  lastDoc = null,
+  unreadOnly = false, pageSize = 20, page = 1,
 } = {}) {
-  try {
-    const constraints = [];
-
-    if (unreadOnly) {
-      constraints.push(where('is_read', '==', false));
-    }
-
-    constraints.push(orderBy('created_at', 'desc'));
-    constraints.push(limit(pageSize));
-
-    if (lastDoc) {
-      constraints.push(startAfter(lastDoc));
-    }
-
-    const q = query(collection(db, 'notifications'), ...constraints);
-    const snapshot = await getDocs(q);
-
-    const data = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
-
-    // Get total count
-    const countConstraints = [];
-    if (unreadOnly) {
-      countConstraints.push(where('is_read', '==', false));
-    }
-    const countQuery = query(collection(db, 'notifications'), ...countConstraints);
-    const countSnap = await getCountFromServer(countQuery);
-    const count = countSnap.data().count;
-
-    return { data, count, lastDoc: lastVisible };
-  } catch (error) {
-    console.error('getNotifications error:', error);
-    throw error;
-  }
+  let query = supabase.from('notifications').select('*', { count: 'exact' });
+  if (unreadOnly) query = query.eq('is_read', false);
+  query = query.order('created_at', { ascending: false });
+  const from = (page - 1) * pageSize;
+  query = query.range(from, from + pageSize - 1);
+  const { data, count, error } = await query;
+  if (error) { console.error('getNotifications error:', error); throw error; }
+  return { data: data || [], count: count || 0 };
 }
 
-/**
- * Mark a single notification as read.
- */
 export async function markAsRead(id) {
-  try {
-    const docRef = doc(db, 'notifications', id);
-    await updateDoc(docRef, { is_read: true });
-
-    const snap = await getDoc(docRef);
-    return { id: snap.id, ...snap.data() };
-  } catch (error) {
-    console.error('markAsRead error:', error);
-    throw error;
-  }
+  const { data, error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) { console.error('markAsRead error:', error); throw error; }
+  return data;
 }
 
-/**
- * Mark all notifications as read.
- */
 export async function markAllAsRead() {
-  try {
-    const q = query(
-      collection(db, 'notifications'),
-      where('is_read', '==', false)
-    );
-    const snapshot = await getDocs(q);
-
-    const batch = writeBatch(db);
-    snapshot.docs.forEach((d) => {
-      batch.update(d.ref, { is_read: true });
-    });
-    await batch.commit();
-
-    // Return updated docs
-    const updated = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-      is_read: true,
-    }));
-
-    return updated;
-  } catch (error) {
-    console.error('markAllAsRead error:', error);
-    throw error;
-  }
+  const { data, error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('is_read', false)
+    .select();
+  if (error) { console.error('markAllAsRead error:', error); throw error; }
+  return data || [];
 }
 
-/**
- * Get the count of unread notifications.
- */
 export async function getUnreadCount() {
-  try {
-    const q = query(
-      collection(db, 'notifications'),
-      where('is_read', '==', false)
-    );
-    const countSnap = await getCountFromServer(q);
-    return countSnap.data().count;
-  } catch (error) {
-    console.error('getUnreadCount error:', error);
-    throw error;
-  }
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('is_read', false);
+  if (error) { console.error('getUnreadCount error:', error); throw error; }
+  return count || 0;
 }

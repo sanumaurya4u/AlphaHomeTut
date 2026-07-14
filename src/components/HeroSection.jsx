@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, UserPlus, GraduationCap, Users, BookOpen } from 'lucide-react';
 
@@ -322,11 +323,6 @@ function MouseGlow() {
    ═══════════════════════════════════════════════════════ */
 
 export default function HeroSection() {
-  const handleNavClick = (e, href) => {
-    e.preventDefault();
-    const el = document.querySelector(href);
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
-  };
 
   return (
     <section id="home" className="relative min-h-screen flex items-center overflow-hidden">
@@ -371,7 +367,7 @@ export default function HeroSection() {
             className="inline-flex items-center gap-2 bg-white/5 border border-white/10 backdrop-blur-md text-secondary px-5 py-2.5 rounded-full text-sm font-medium mb-6 shadow-lg shadow-secondary/5"
           >
             <span className="w-2 h-2 bg-secondary rounded-full animate-pulse" />
-            Trusted by 1000+ Students & Parents
+            Quality Education at Your Doorstep
           </motion.div>
 
           {/* Heading */}
@@ -404,43 +400,18 @@ export default function HeroSection() {
             transition={{ duration: 0.7, delay: 0.6 }}
             className="flex flex-wrap gap-4 mb-14"
           >
-            <a
-              href="#find-tutor"
-              onClick={(e) => handleNavClick(e, '#find-tutor')}
+            <Link
+              to="/find-tutor"
               className="inline-flex items-center gap-2 bg-secondary text-primary font-bold px-8 py-4 rounded-full text-base hover:bg-secondary-light transition-all hover:shadow-xl hover:shadow-secondary/25 hover:-translate-y-0.5 pulse-glow"
             >
               <Search className="w-5 h-5" />
               Find Tutor
-            </a>
-            <a
-              href="#become-tutor"
-              onClick={(e) => handleNavClick(e, '#become-tutor')}
-              className="inline-flex items-center gap-2 bg-white/5 border border-white/15 text-white font-semibold px-8 py-4 rounded-full text-base hover:bg-white/10 transition-all hover:-translate-y-0.5 backdrop-blur-md"
-            >
-              <UserPlus className="w-5 h-5" />
-              Become Tutor
-            </a>
+            </Link>
+
           </motion.div>
 
-          {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.8 }}
-            className="flex flex-wrap gap-6 md:gap-10"
-          >
-            {heroStats.map((stat, i) => (
-              <div key={i} className="flex items-center gap-3 group">
-                <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center border border-white/10 backdrop-blur-sm group-hover:border-secondary/40 group-hover:bg-secondary/10 transition-all duration-300">
-                  <stat.icon className="w-6 h-6 text-secondary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-white">{stat.value}</p>
-                  <p className="text-white/40 text-sm">{stat.label}</p>
-                </div>
-              </div>
-            ))}
-          </motion.div>
+          {/* Stats removed for now until real data is available */}
+          <div className="mb-20" />
         </div>
       </div>
 

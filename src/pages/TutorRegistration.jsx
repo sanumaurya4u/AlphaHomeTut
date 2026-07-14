@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   User, Phone, Mail, MapPin, BookOpen, GraduationCap, Briefcase,
@@ -8,6 +8,7 @@ import {
   ArrowLeft, ArrowRight, Sparkles, ChevronRight, Loader2
 } from 'lucide-react';
 import { registerTutor } from '@/services/tutorService';
+import { useAuth } from '@/context/AuthContext';
 
 const stepTitles = [
   { title: 'Personal Details', icon: User },
@@ -19,6 +20,15 @@ const stepTitles = [
 ];
 
 export default function TutorRegistration() {
+  const { user, profile } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && profile?.role === 'tutor') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, profile, navigate]);
+
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

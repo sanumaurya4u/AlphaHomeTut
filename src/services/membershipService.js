@@ -1,184 +1,75 @@
-import { db } from '@/firebase/config';
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  startAfter,
-  getCountFromServer,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { supabase } from '@/supabase/config';
 
-/**
- * Create a new membership with a default 1-year expiry and Active status.
- */
 export async function createMembership(data) {
-  try {
-    const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+  const expiresAt = new Date();
+  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-    const membershipData = {
-      tutor_id: data.tutor_id,
-      plan_name: data.plan_name,
-      amount: data.amount,
-      status: 'Active',
-      expires_at: expiresAt.toISOString(),
-      created_at: serverTimestamp(),
-    };
+  const membershipData = {
+    tutor_id: data.tutor_id,
+    plan: data.plan_name || data.plan,
+    amount: data.amount,
+    payment_status: 'Pending',
+    start_date: new Date().toISOString(),
+    end_date: expiresAt.toISOString(),
+  };
 
-    const docRef = await addDoc(collection(db, 'memberships'), membershipData);
-
-    return { id: docRef.id, ...membershipData };
-  } catch (error) {
-    console.error('createMembership error:', error);
-    throw error;
-  }
+  const { data: membership, error } = await supabase
+    .from('tutor_memberships')
+    .insert([membershipData])
+    .select()
+    .single();
+  if (error) { console.error('createMembership error:', error); throw error; }
+  return membership;
 }
 
-/**
- * Fetch memberships with optional filtering, search, and pagination.
- * Joins with tutors to include the tutor's full_name, email, phone.
- */
 export async function getMemberships({
-  search = '',
-  status = '',
-  planName = '',
-  page = 1,
-  pageSize = 10,
-  lastDoc = null,
+  search = '', status = '', planName = '',
+  page = 1, pageSize = 10,
 } = {}) {
-  try {
-    const membershipsRef = collection(db, 'memberships');
-    const constraints = [];
+  let query = supabase
+    .from('tutor_memberships')
+    .select(`
+      *,
+      tutors ( full_name, email, phone )
+    `, { count: 'exact' });
+  if (status) query = query.eq('payment_status', status);
+  if (planName) query = query.eq('plan', planName);
+  query = query.order('created_at', { ascending: false });
+  const from = (page - 1) * pageSize;
+  query = query.range(from, from + pageSize - 1);
+  let { data, count, error } = await query;
+  if (error) { console.error('getMemberships error:', error); throw error; }
 
-    if (status) {
-      constraints.push(where('status', '==', status));
-    }
-
-    if (planName) {
-      constraints.push(where('plan_name', '==', planName));
-    }
-
-    constraints.push(orderBy('created_at', 'desc'));
-    constraints.push(limit(pageSize));
-
-    if (lastDoc) {
-      constraints.push(startAfter(lastDoc));
-    }
-
-    const q = query(membershipsRef, ...constraints);
-    const snapshot = await getDocs(q);
-
-    // Fetch related tutor data for each membership
-    const data = await Promise.all(
-      snapshot.docs.map(async (docSnap) => {
-        const membership = { id: docSnap.id, ...docSnap.data() };
-
-        let tutorData = null;
-        if (membership.tutor_id) {
-          try {
-            const tutorSnap = await getDoc(doc(db, 'tutors', membership.tutor_id));
-            if (tutorSnap.exists()) {
-              const t = tutorSnap.data();
-              tutorData = {
-                full_name: t.full_name,
-                email: t.email,
-                phone: t.phone,
-              };
-            }
-          } catch {
-            // Silently handle missing tutor reference
-          }
-        }
-
-        return {
-          ...membership,
-          tutors: tutorData,
-        };
-      })
+  if (search) {
+    const s = search.toLowerCase();
+    data = (data || []).filter(m =>
+      (m.plan || '').toLowerCase().includes(s) ||
+      (m.tutors?.full_name || '').toLowerCase().includes(s)
     );
-
-    // Client-side search on plan_name and tutor full_name
-    let filteredData = data;
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filteredData = data.filter(
-        (m) =>
-          (m.plan_name && m.plan_name.toLowerCase().includes(searchLower)) ||
-          (m.tutors?.full_name && m.tutors.full_name.toLowerCase().includes(searchLower))
-      );
-    }
-
-    // Count query
-    const countConstraints = [];
-    if (status) {
-      countConstraints.push(where('status', '==', status));
-    }
-    if (planName) {
-      countConstraints.push(where('plan_name', '==', planName));
-    }
-    const countQuery = countConstraints.length > 0
-      ? query(membershipsRef, ...countConstraints)
-      : membershipsRef;
-    const countSnapshot = await getCountFromServer(countQuery);
-    const count = countSnapshot.data().count;
-
-    const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
-
-    return { data: filteredData, count, lastDoc: lastVisible };
-  } catch (error) {
-    console.error('getMemberships error:', error);
-    throw error;
   }
+  return { data: data || [], count: count || 0 };
 }
 
-/**
- * Update the status of a membership.
- */
 export async function updateMembershipStatus(id, status) {
-  try {
-    const membershipRef = doc(db, 'memberships', id);
-    await updateDoc(membershipRef, { status });
-
-    const updatedSnap = await getDoc(membershipRef);
-    return { id: updatedSnap.id, ...updatedSnap.data() };
-  } catch (error) {
-    console.error('updateMembershipStatus error:', error);
-    throw error;
-  }
+  const { data, error } = await supabase
+    .from('tutor_memberships')
+    .update({ payment_status: status })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) { console.error('updateMembershipStatus error:', error); throw error; }
+  return data;
 }
 
-/**
- * Get membership stats grouped by plan type and status.
- */
 export async function getMembershipStats() {
-  try {
-    const snapshot = await getDocs(collection(db, 'memberships'));
-
-    const stats = {
-      total: snapshot.size,
-      byPlan: {},
-      byStatus: {},
-    };
-
-    snapshot.docs.forEach((docSnap) => {
-      const data = docSnap.data();
-      const plan = data.plan_name || 'Unknown';
-      const membershipStatus = data.status || 'Unknown';
-
-      stats.byPlan[plan] = (stats.byPlan[plan] || 0) + 1;
-      stats.byStatus[membershipStatus] = (stats.byStatus[membershipStatus] || 0) + 1;
-    });
-
-    return stats;
-  } catch (error) {
-    console.error('getMembershipStats error:', error);
-    throw error;
-  }
+  const { data, error } = await supabase.from('tutor_memberships').select('plan, payment_status');
+  if (error) { console.error('getMembershipStats error:', error); throw error; }
+  const stats = { total: (data || []).length, byPlan: {}, byStatus: {} };
+  (data || []).forEach(m => {
+    const plan = m.plan || 'Unknown';
+    const s = m.payment_status || 'Unknown';
+    stats.byPlan[plan] = (stats.byPlan[plan] || 0) + 1;
+    stats.byStatus[s] = (stats.byStatus[s] || 0) + 1;
+  });
+  return stats;
 }

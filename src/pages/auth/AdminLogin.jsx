@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { GraduationCap, Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
+import { signIn } from '@/services/authService';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const { user, isAdmin, loading: authLoading, login } = useAuth();
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState('');
@@ -29,12 +30,7 @@ export default function AdminLogin() {
 
     setIsSubmitting(true);
     try {
-      const { error } = await login(email, password);
-
-      if (error) {
-        toast.error(error.message || 'Invalid email or password.');
-        return;
-      }
+      await signIn({ email, password });
 
       toast.success('Welcome back, Admin!');
       navigate('/admin/dashboard', { replace: true });
@@ -73,9 +69,9 @@ export default function AdminLogin() {
         <div className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-3xl p-8 md:p-10 shadow-2xl shadow-black/30">
           {/* Branding */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-secondary/15 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <GraduationCap className="w-8 h-8 text-secondary" />
-            </div>
+            <Link to="/" className="w-16 h-16 bg-secondary/15 rounded-2xl flex items-center justify-center mx-auto mb-4 hover:bg-secondary/25 hover:scale-[1.02] transition-all inline-flex">
+              <img src="/AHT-logo.svg" alt="AlphaHomeTut Logo" className="w-10 h-10 object-contain" />
+            </Link>
             <h1 className="text-2xl font-bold text-white">Alpha Home Tuition</h1>
             <p className="text-white/40 text-sm mt-1">Admin Portal</p>
           </div>

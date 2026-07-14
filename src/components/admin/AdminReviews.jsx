@@ -1,0 +1,1 @@
+export default function AdminReviews() { return <div className='p-6 bg-white rounded-3xl shadow-sm border border-gray-100'><h2 className='text-2xl font-bold text-primary mb-4'>AdminReviews</h2><p className='text-gray-500'>This section is under construction.</p></div>; }

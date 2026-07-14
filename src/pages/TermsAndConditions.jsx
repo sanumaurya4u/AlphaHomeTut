@@ -38,10 +38,14 @@ export default function TermsAndConditions() {
             <p className="text-white/60 max-w-2xl mx-auto text-lg mb-8">
               Alpha Home Tuition Pvt. Ltd. — Please read these terms carefully before registering with us.
             </p>
-            <button className="inline-flex items-center gap-2 bg-white/10 border border-white/20 text-white font-semibold px-6 py-3 rounded-full text-sm hover:bg-white/20 transition-all backdrop-blur-sm">
+            <a 
+              href="/TnC%20Alpha%20Sol.pdf" 
+              download="TnC_Alpha_Sol.pdf"
+              className="inline-flex items-center gap-2 bg-white/10 border border-white/20 text-white font-semibold px-6 py-3 rounded-full text-sm hover:bg-white/20 transition-all backdrop-blur-sm"
+            >
               <Download className="w-4 h-4" />
               Download PDF
-            </button>
+            </a>
           </motion.div>
         </div>
       </section>

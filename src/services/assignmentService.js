@@ -1,167 +1,56 @@
-import { db } from '@/firebase/config';
-import {
-  collection,
-  doc,
-  addDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  startAfter,
-  getCountFromServer,
-  serverTimestamp,
-} from 'firebase/firestore';
+import { supabase } from '@/supabase/config';
 
-/**
- * Create a new tutor assignment.
- */
 export async function createAssignment(data) {
-  try {
-    const docRef = await addDoc(collection(db, 'assigned_tutors'), {
-      ...data,
-      created_at: serverTimestamp(),
-    });
-
-    return { id: docRef.id, ...data };
-  } catch (error) {
-    console.error('createAssignment error:', error);
-    throw error;
-  }
+  const { data: assignment, error } = await supabase
+    .from('tutor_assignments')
+    .insert([data])
+    .select()
+    .single();
+  if (error) { console.error('createAssignment error:', error); throw error; }
+  return assignment;
 }
 
-/**
- * Fetch assignments with optional filtering, search, and pagination.
- * Performs secondary lookups on demo_requests and tutors to join related data.
- */
 export async function getAssignments({
-  search = '',
-  status = '',
-  page = 1,
-  pageSize = 10,
-  lastDoc = null,
+  search = '', status = '',
+  page = 1, pageSize = 10,
 } = {}) {
-  try {
-    const assignmentsRef = collection(db, 'assigned_tutors');
-    const constraints = [];
+  let query = supabase
+    .from('tutor_assignments')
+    .select(`
+      *,
+      demo_requests ( student_name, subject, class ),
+      tutors ( full_name )
+    `, { count: 'exact' });
+  if (status) query = query.eq('status', status);
+  query = query.order('created_at', { ascending: false });
+  const from = (page - 1) * pageSize;
+  query = query.range(from, from + pageSize - 1);
+  let { data, count, error } = await query;
+  if (error) { console.error('getAssignments error:', error); throw error; }
 
-    if (status) {
-      constraints.push(where('status', '==', status));
-    }
-
-    constraints.push(orderBy('created_at', 'desc'));
-    constraints.push(limit(pageSize));
-
-    if (lastDoc) {
-      constraints.push(startAfter(lastDoc));
-    }
-
-    const q = query(assignmentsRef, ...constraints);
-    const snapshot = await getDocs(q);
-
-    // Fetch related data for each assignment
-    const data = await Promise.all(
-      snapshot.docs.map(async (docSnap) => {
-        const assignment = { id: docSnap.id, ...docSnap.data() };
-
-        // Fetch related demo_request
-        let demoRequestData = null;
-        if (assignment.demo_request_id) {
-          try {
-            const demoSnap = await getDoc(doc(db, 'demo_requests', assignment.demo_request_id));
-            if (demoSnap.exists()) {
-              const d = demoSnap.data();
-              demoRequestData = {
-                student_name: d.student_name,
-                subject: d.subject,
-                class: d.class,
-              };
-            }
-          } catch {
-            // Silently handle missing reference
-          }
-        }
-
-        // Fetch related tutor
-        let tutorData = null;
-        if (assignment.tutor_id) {
-          try {
-            const tutorSnap = await getDoc(doc(db, 'tutors', assignment.tutor_id));
-            if (tutorSnap.exists()) {
-              tutorData = { full_name: tutorSnap.data().full_name };
-            }
-          } catch {
-            // Silently handle missing reference
-          }
-        }
-
-        return {
-          ...assignment,
-          demo_requests: demoRequestData,
-          tutors: tutorData,
-        };
-      })
+  if (search) {
+    const s = search.toLowerCase();
+    data = (data || []).filter(a =>
+      (a.demo_requests?.student_name || '').toLowerCase().includes(s) ||
+      (a.tutors?.full_name || '').toLowerCase().includes(s)
     );
-
-    // Client-side search on student_name and tutor full_name
-    let filteredData = data;
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filteredData = data.filter(
-        (a) =>
-          (a.demo_requests?.student_name && a.demo_requests.student_name.toLowerCase().includes(searchLower)) ||
-          (a.tutors?.full_name && a.tutors.full_name.toLowerCase().includes(searchLower))
-      );
-    }
-
-    // Count query
-    const countConstraints = [];
-    if (status) {
-      countConstraints.push(where('status', '==', status));
-    }
-    const countQuery = countConstraints.length > 0
-      ? query(assignmentsRef, ...countConstraints)
-      : assignmentsRef;
-    const countSnapshot = await getCountFromServer(countQuery);
-    const count = countSnapshot.data().count;
-
-    const lastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
-
-    return { data: filteredData, count, lastDoc: lastVisible };
-  } catch (error) {
-    console.error('getAssignments error:', error);
-    throw error;
   }
+  return { data: data || [], count: count || 0 };
 }
 
-/**
- * Update an assignment's status and/or notes.
- */
 export async function updateAssignment(id, data) {
-  try {
-    const assignmentRef = doc(db, 'assigned_tutors', id);
-    await updateDoc(assignmentRef, data);
-
-    const updatedSnap = await getDoc(assignmentRef);
-    return { id: updatedSnap.id, ...updatedSnap.data() };
-  } catch (error) {
-    console.error('updateAssignment error:', error);
-    throw error;
-  }
+  const { data: updated, error } = await supabase
+    .from('tutor_assignments')
+    .update({ ...data, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) { console.error('updateAssignment error:', error); throw error; }
+  return updated;
 }
 
-/**
- * Delete an assignment by ID.
- */
 export async function deleteAssignment(id) {
-  try {
-    await deleteDoc(doc(db, 'assigned_tutors', id));
-    return true;
-  } catch (error) {
-    console.error('deleteAssignment error:', error);
-    throw error;
-  }
+  const { error } = await supabase.from('tutor_assignments').delete().eq('id', id);
+  if (error) { console.error('deleteAssignment error:', error); throw error; }
+  return true;
 }

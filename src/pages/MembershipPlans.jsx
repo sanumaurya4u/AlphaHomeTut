@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Crown, Star, Zap, Shield, Users, IndianRupee, ArrowRight, Award } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 const plans = [
   {
@@ -54,6 +55,7 @@ const plans = [
 
 export default function MembershipPlans() {
   const [hoveredPlan, setHoveredPlan] = useState(null);
+  const { profile } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -148,7 +150,7 @@ export default function MembershipPlans() {
 
                 {/* CTA */}
                 <Link
-                  to="/register"
+                  to={profile?.role === 'tutor' ? '/dashboard?tab=membership' : '/register'}
                   className={`w-full flex items-center justify-center gap-2 font-bold py-4 rounded-xl text-base transition-all hover:shadow-lg hover:-translate-y-0.5 ${
                     plan.badge
                       ? 'bg-secondary text-primary hover:bg-secondary-light hover:shadow-secondary/30 pulse-glow'
@@ -238,7 +240,7 @@ export default function MembershipPlans() {
               <h3 className="text-2xl md:text-3xl font-bold text-white mb-3">Ready to Start Teaching?</h3>
               <p className="text-white/60 max-w-lg mx-auto mb-8">Register today and get your first tuition assignment. Join 500+ tutors already earning with Alpha Home Tuition.</p>
               <Link
-                to="/register"
+                to={profile?.role === 'tutor' ? '/dashboard?tab=membership' : '/register'}
                 className="inline-flex items-center gap-2 bg-secondary text-primary font-bold px-8 py-4 rounded-full text-base hover:bg-secondary-light transition-all hover:shadow-xl hover:shadow-secondary/25 hover:-translate-y-0.5 pulse-glow"
               >
                 <Zap className="w-5 h-5" />

@@ -1,26 +1,35 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { lazy, Suspense, useEffect } from 'react';
-import '@n8n/chat/style.css';
-import { createChat } from '@n8n/chat';
+import { lazy, Suspense } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import WhatsAppButton from './components/WhatsAppButton';
 import ScrollToTop from './components/ScrollToTop';
 import ScrollToTopOnNavigate from './components/ScrollToTopOnNavigate';
 import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Lazy load pages
-const PortalSelection = lazy(() => import('./pages/PortalSelection'));
+const Login = lazy(() => import('./pages/auth/Login'));
+const Signup = lazy(() => import('./pages/auth/Signup'));
+const TutorLogin = lazy(() => import('./pages/auth/TutorLogin'));
+const TutorRegister = lazy(() => import('./pages/auth/TutorRegister'));
 const HomePage = lazy(() => import('./pages/HomePage'));
+const StudentHome = lazy(() => import('./pages/StudentHome'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ServicesPage = lazy(() => import('./pages/ServicesPage'));
+const FindTutorPage = lazy(() => import('./pages/FindTutorPage'));
+const BecomeTutorPage = lazy(() => import('./pages/BecomeTutorPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
 const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const RefundPolicy = lazy(() => import('./pages/RefundPolicy'));
 const TutorRegistration = lazy(() => import('./pages/TutorRegistration'));
 const MembershipPlans = lazy(() => import('./pages/MembershipPlans'));
 const TutorDashboard = lazy(() => import('./pages/TutorDashboard'));
-const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
+const AdminLogin = lazy(() => import('./pages/auth/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const ChatBot = lazy(() => import('./components/chatbot/ChatBot'));
 
 function PageLoader() {
   return (
@@ -33,41 +42,24 @@ function PageLoader() {
   );
 }
 
-function Layout({ children, hideNavFooter }) {
+function Layout({ children, hideNavFooter, hideChatBot, hideTutorOptions }) {
   return (
     <div className="min-h-screen bg-white">
       {!hideNavFooter && <Navbar />}
-      <main>{children}</main>
-      {!hideNavFooter && <Footer />}
+      <main className={!hideNavFooter ? "pb-20 lg:pb-0" : ""}>{children}</main>
+      {!hideNavFooter && <Footer hideTutorOptions={hideTutorOptions} />}
       <WhatsAppButton />
+      {!hideChatBot && (
+        <Suspense fallback={null}>
+          <ChatBot />
+        </Suspense>
+      )}
       <ScrollToTop />
     </div>
   );
 }
 
 export default function App() {
-  useEffect(() => {
-    // Remove any existing n8n-chat container to avoid duplicates (React StrictMode double-mounts)
-    const existingChat = document.getElementById('n8n-chat');
-    if (existingChat) {
-      existingChat.remove();
-    }
-
-    const chatApp = createChat({
-      webhookUrl: 'https://sanumaurya4tech.app.n8n.cloud/webhook/37bd7585-f6cd-4f06-a30a-66fe7334511e/chat',
-      enableStreaming: false
-    });
-
-    return () => {
-      // Cleanup on unmount
-      chatApp?.unmount?.();
-      const chatEl = document.getElementById('n8n-chat');
-      if (chatEl) {
-        chatEl.remove();
-      }
-    };
-  }, []);
-
   return (
     <AuthProvider>
       <Toaster
@@ -93,16 +85,31 @@ export default function App() {
       <ScrollToTopOnNavigate />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/" element={<PortalSelection />} />
-          <Route path="/home" element={<Layout><HomePage /></Layout>} />
+          {/* Public auth routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/tutor/login" element={<Layout hideNavFooter><TutorLogin /></Layout>} />
+          <Route path="/tutor/register" element={<Layout hideNavFooter><TutorRegister /></Layout>} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/admin/login" element={<Layout hideNavFooter hideChatBot><AdminLogin /></Layout>} />
+
+          {/* Public informational and landing routes */}
+          <Route path="/" element={<Layout hideNavFooter><HomePage /></Layout>} />
+          <Route path="/student" element={<Layout hideTutorOptions><StudentHome /></Layout>} />
+          <Route path="/home" element={<Navigate to="/" replace />} />
+          <Route path="/about" element={<Layout><AboutPage /></Layout>} />
+          <Route path="/services" element={<Layout><ServicesPage /></Layout>} />
+          <Route path="/find-tutor" element={<Layout><FindTutorPage /></Layout>} />
+          <Route path="/become-tutor" element={<Layout><BecomeTutorPage /></Layout>} />
+          <Route path="/contact" element={<Layout><ContactPage /></Layout>} />
           <Route path="/terms" element={<Layout><TermsAndConditions /></Layout>} />
           <Route path="/privacy" element={<Layout><PrivacyPolicy /></Layout>} />
           <Route path="/refund" element={<Layout><RefundPolicy /></Layout>} />
           <Route path="/register" element={<Layout><TutorRegistration /></Layout>} />
           <Route path="/membership" element={<Layout><MembershipPlans /></Layout>} />
-          <Route path="/dashboard" element={<Layout hideNavFooter><TutorDashboard /></Layout>} />
-          <Route path="/admin/login" element={<Layout hideNavFooter><AdminLogin /></Layout>} />
-          <Route path="/admin/dashboard" element={<Layout hideNavFooter><AdminDashboard /></Layout>} />
+
+          {/* Protected routes - require login & roles */}
+          <Route path="/dashboard" element={<ProtectedRoute requiredRole="tutor"><Layout hideNavFooter><TutorDashboard /></Layout></ProtectedRoute>} />
+          <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><Layout hideNavFooter hideChatBot><AdminDashboard /></Layout></ProtectedRoute>} />
         </Routes>
       </Suspense>
     </AuthProvider>

@@ -27,6 +27,15 @@ const policies = [
 ];
 
 export default function CompanyPolicies() {
+  const isDashboard = window.location.pathname.includes('/dashboard');
+  const getRoute = (originalRoute) => {
+    if (!isDashboard) return originalRoute;
+    if (originalRoute.includes('terms')) return '?tab=terms';
+    if (originalRoute.includes('privacy')) return '?tab=privacy';
+    if (originalRoute.includes('refund')) return '?tab=refund';
+    return originalRoute;
+  };
+
   return (
     <section className="py-20 md:py-28 bg-primary relative overflow-hidden">
       <div className="absolute inset-0">
@@ -60,7 +69,7 @@ export default function CompanyPolicies() {
               viewport={{ once: true, margin: '-60px' }}
               transition={{ duration: 0.5, delay: i * 0.15 }}
             >
-              <Link to={policy.link} className="block group h-full">
+              <Link to={getRoute(policy.link)} className="block group h-full">
                 <div className="glass rounded-2xl p-8 h-full hover:border-secondary/30 transition-all duration-300 card-hover">
                   <div className={`w-14 h-14 bg-gradient-to-br ${policy.color} rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-lg`}>
                     <policy.icon className="w-7 h-7 text-white" />

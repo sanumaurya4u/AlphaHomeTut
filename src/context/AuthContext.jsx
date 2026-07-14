@@ -1,99 +1,77 @@
-import { createContext, useState, useEffect } from 'react';
-import { auth, db } from '@/firebase/config';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut as firebaseSignOut } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/supabase/config';
 
-export const AuthContext = createContext(null);
+const AuthContext = createContext({});
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [adminData, setAdminData] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  /**
-   * Query the admin_users Firestore collection to check if the given userId
-   * has an admin record. Returns the admin row or null.
-   */
-  const fetchAdminData = async (userId) => {
+  const fetchProfile = async (userId) => {
     try {
-      const q = query(
-        collection(db, 'admin_users'),
-        where('user_id', '==', userId)
-      );
-      const snapshot = await getDocs(q);
-
-      if (snapshot.empty) {
-        return null;
-      }
-
-      const docSnap = snapshot.docs[0];
-      return { id: docSnap.id, ...docSnap.data() };
-    } catch (err) {
-      console.error('fetchAdminData exception:', err);
-      return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (error) throw error;
+      setProfile(data);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setProfile(null);
     }
   };
 
-  /**
-   * Handle auth state changes — set user + admin state accordingly.
-   */
-  const handleUser = async (firebaseUser) => {
-    if (firebaseUser) {
-      setUser(firebaseUser);
-
-      const admin = await fetchAdminData(firebaseUser.uid);
-      if (admin) {
-        setAdminData(admin);
-        setIsAdmin(true);
-      } else {
-        setAdminData(null);
-        setIsAdmin(false);
-      }
-    } else {
-      setUser(null);
-      setAdminData(null);
-      setIsAdmin(false);
+  const refreshProfile = async () => {
+    if (user?.id) {
+      await fetchProfile(user.id);
     }
+  };
 
-    setLoading(false);
+  const signOutUser = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   useEffect(() => {
-    // Subscribe to Firebase auth state changes
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      await handleUser(firebaseUser);
+    // Get initial session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchProfile(session.user.id);
+      }
+      setLoading(false);
     });
 
-    return () => {
-      unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        } else {
+          setProfile(null);
+        }
+        setLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
-
-  /**
-   * Sign in with email and password.
-   * Returns the UserCredential from Firebase Auth.
-   */
-  const login = async (email, password) => {
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    return result;
-  };
-
-  /**
-   * Sign out the current user.
-   */
-  const logout = async () => {
-    await firebaseSignOut(auth);
-  };
 
   const value = {
     user,
-    adminData,
-    isAdmin,
+    profile,
     loading,
-    login,
-    logout,
+    isAdmin: profile?.role === 'admin',
+    isTutor: profile?.role === 'tutor',
+    isStudent: profile?.role === 'student',
+    refreshProfile,
+    signOutUser,
   };
 
   return (
@@ -102,3 +80,13 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
+export default AuthContext;

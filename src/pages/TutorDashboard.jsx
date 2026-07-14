@@ -1,362 +1,229 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import {
-  LayoutDashboard, BookOpen, Send, IndianRupee, Bell, Settings, User,
-  TrendingUp, Clock, MapPin, ChevronRight, Star, Calendar, CheckCircle2,
-  AlertCircle, Menu, X, LogOut
-} from 'lucide-react';
-
-const menuItems = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'available', label: 'Available Tuitions', icon: BookOpen },
-  { id: 'applied', label: 'Applied Tuitions', icon: Send },
-  { id: 'earnings', label: 'Earnings', icon: IndianRupee },
-  { id: 'notifications', label: 'Notifications', icon: Bell, badge: 3 },
-  { id: 'settings', label: 'Profile Settings', icon: Settings },
-];
-
-const dashboardStats = [
-  { label: 'Active Tuitions', value: '3', icon: BookOpen, color: 'bg-blue-500', change: '+1 this month' },
-  { label: 'Pending Requests', value: '2', icon: Clock, color: 'bg-amber-500', change: 'Awaiting response' },
-  { label: 'Monthly Earnings', value: '₹12,500', icon: IndianRupee, color: 'bg-emerald-500', change: '+₹2,500 vs last month' },
-  { label: 'Upcoming Demos', value: '1', icon: Calendar, color: 'bg-purple-500', change: 'Tomorrow, 4 PM' },
-];
-
-const availableTuitions = [
-  { id: 1, subject: 'Mathematics', class: 'Class 10', location: 'Boring Road, Patna', salary: '₹3,000', mode: 'Home', timing: 'Evening (5-7 PM)', posted: '2 hours ago' },
-  { id: 2, subject: 'Physics + Chemistry', class: 'Class 12', location: 'Kankarbagh, Patna', salary: '₹4,000', mode: 'Home', timing: 'Morning (8-10 AM)', posted: '5 hours ago' },
-  { id: 3, subject: 'English', class: 'Class 8', location: 'Danapur, Patna', salary: '₹2,000', mode: 'Online', timing: 'Evening (4-5 PM)', posted: '1 day ago' },
-  { id: 4, subject: 'All Subjects', class: 'Class 5', location: 'Rajendra Nagar, Patna', salary: '₹2,500', mode: 'Home', timing: 'Afternoon (3-5 PM)', posted: '1 day ago' },
-];
-
-const appliedTuitions = [
-  { id: 1, subject: 'Science', class: 'Class 9', location: 'Bailey Road', salary: '₹3,000', status: 'Demo Scheduled', statusColor: 'text-blue-600 bg-blue-50' },
-  { id: 2, subject: 'Mathematics', class: 'Class 7', location: 'Patliputra', salary: '₹2,500', status: 'Under Review', statusColor: 'text-amber-600 bg-amber-50' },
-];
-
-const notifications = [
-  { id: 1, text: 'New tuition available: Class 10 Mathematics in Boring Road', time: '2 hours ago', read: false },
-  { id: 2, text: 'Your demo for Class 9 Science is scheduled for tomorrow at 4 PM', time: '5 hours ago', read: false },
-  { id: 3, text: 'Payment of ₹3,000 received for October tuition', time: '1 day ago', read: false },
-  { id: 4, text: 'Monthly earnings report for September is ready', time: '3 days ago', read: true },
-  { id: 5, text: 'Profile verification completed successfully', time: '1 week ago', read: true },
-];
-
-const earningsData = [
-  { month: 'May', amount: 8000 },
-  { month: 'Jun', amount: 9500 },
-  { month: 'Jul', amount: 10000 },
-  { month: 'Aug', amount: 11000 },
-  { month: 'Sep', amount: 10000 },
-  { month: 'Oct', amount: 12500 },
-];
+import { useState, useEffect } from 'react';
+import { Menu } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/supabase/config';
+import Footer from '@/components/Footer';
+import BecomeTutorForm from '@/components/BecomeTutorForm';
+import TutorSidebar from '@/components/tutor/TutorSidebar';
+import TutorProfile from '@/components/tutor/TutorProfile';
+import TutorApplications from '@/components/tutor/TutorApplications';
+import TutorDocuments from '@/components/tutor/TutorDocuments';
+import TutorMembership from '@/components/tutor/TutorMembership';
+import TutorEarnings from '@/components/tutor/TutorEarnings';
+import TutorNotifications from '@/components/tutor/TutorNotifications';
+import TutorSettings from '@/components/tutor/TutorSettings';
+import TermsAndConditions from '@/pages/TermsAndConditions';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import RefundPolicy from '@/pages/RefundPolicy';
+import AboutPage from '@/pages/AboutPage';
+import ServicesPage from '@/pages/ServicesPage';
+import ContactPage from '@/pages/ContactPage';
 
 export default function TutorDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const { user, profile } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'profile');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const maxEarning = Math.max(...earningsData.map(e => e.amount));
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
+  const [tutorProfile, setTutorProfile] = useState(null);
+  const [loadingTutor, setLoadingTutor] = useState(true);
+
+  // Synchronize search params with active tab state
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
+
+  // Handle window resize for mobile check
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Fetch tutor profile to ensure they have filled the form or auto-create it
+  useEffect(() => {
+    const fetchTutor = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('tutors')
+          .select('*')
+          .or(`email.ilike.${user?.email},profile_id.eq.${user?.id}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          // If the profile was created via registration form before signup, link it now
+          if (!data.profile_id) {
+            const { data: updated } = await supabase
+              .from('tutors')
+              .update({ profile_id: user.id })
+              .eq('id', data.id)
+              .select()
+              .single();
+            setTutorProfile(updated || data);
+          } else {
+            setTutorProfile(data);
+          }
+        } else if (!data) {
+          // Profile does not exist in tutors table, auto-create a default one
+          const { data: newTutor, error: insertError } = await supabase
+            .from('tutors')
+            .insert([{
+              email: user.email,
+              full_name: profile?.full_name || user.user_metadata?.full_name || user.email.split('@')[0],
+              profile_id: user.id,
+              status: 'Pending'
+            }])
+            .select()
+            .single();
+            
+          if (!insertError && newTutor) {
+            setTutorProfile(newTutor);
+          } else {
+            console.error('Failed to auto-create tutor profile:', insertError);
+          }
+        } else if (error) {
+          console.error('Error fetching tutor profile:', error);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingTutor(false);
+      }
+    };
+    if (user?.email) {
+      fetchTutor();
+    } else {
+      setLoadingTutor(false);
+    }
+  }, [user, profile]);
+
+  if (loadingTutor) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary/20 border-t-secondary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400 text-sm font-medium">Loading your portal...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If they haven't applied yet and somehow auto-creation failed, initialize an empty profile
+  // so they can access the dashboard and fill their details in the Profile tab.
+  const currentProfile = tutorProfile || {
+    id: null,
+    full_name: profile?.full_name || user?.user_metadata?.full_name || (user?.email ? user.email.split('@')[0] : ''),
+    email: user?.email || '',
+    phone: profile?.phone || '',
+    status: 'Pending'
+  };
+
+  // Render active tab component
+  const renderTab = () => {
+    switch (activeTab) {
+      case 'profile': return <TutorProfile profile={currentProfile} setProfile={setTutorProfile} />;
+      case 'applications': return <TutorApplications tutorId={currentProfile.id} />;
+      case 'documents': return <TutorDocuments tutorId={currentProfile.id} />;
+      case 'membership': return <TutorMembership tutorId={currentProfile.id} />;
+      case 'earnings': return <TutorEarnings tutorId={currentProfile.id} />;
+      case 'notifications': return <TutorNotifications tutorId={currentProfile.id} />;
+      case 'settings': return <TutorSettings profile={currentProfile} />;
+      case 'terms': return <TermsAndConditions />;
+      case 'privacy': return <PrivacyPolicy />;
+      case 'refund': return <RefundPolicy />;
+      case 'about': return <AboutPage />;
+      case 'services': return <ServicesPage />;
+      case 'contact': return <ContactPage />;
+      default: return <TutorProfile profile={currentProfile} setProfile={setTutorProfile} />;
+    }
+  };
+
+  const initials = currentProfile.full_name
+    ? currentProfile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+    : 'U';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Top bar for mobile */}
-      <div className="lg:hidden bg-primary px-4 py-3 flex items-center justify-between sticky top-0 z-50">
-        <button onClick={() => setSidebarOpen(true)} className="text-white p-2 hover:bg-white/10 rounded-lg">
-          <Menu className="w-5 h-5" />
-        </button>
-        <span className="text-white font-bold text-sm">Tutor Dashboard</span>
-        <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center text-primary text-xs font-bold">RK</div>
-      </div>
+    <div className="min-h-screen bg-gray-50 flex overflow-hidden">
+      
+      {/* Sidebar */}
+      <TutorSidebar 
+        activeTab={activeTab} 
+        setActiveTab={handleTabChange} 
+        isOpen={sidebarOpen} 
+        setIsOpen={setSidebarOpen} 
+        isMobile={isMobile}
+      />
 
-      <div className="flex">
-        {/* Sidebar Overlay (mobile) */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 bg-black/50 z-50 lg:hidden" onClick={() => setSidebarOpen(false)} />
-        )}
-
-        {/* Sidebar */}
-        <aside className={`fixed lg:sticky top-0 left-0 h-screen w-64 bg-primary text-white flex-shrink-0 z-50 transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}>
-          <div className="p-6 h-full flex flex-col">
-            {/* Close button mobile */}
-            <div className="lg:hidden flex justify-end mb-2">
-              <button onClick={() => setSidebarOpen(false)} className="text-white/70 hover:text-white">
-                <X className="w-5 h-5" />
+      {/* Main Content Area */}
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${!isMobile && sidebarOpen ? 'ml-64' : !isMobile && !sidebarOpen ? 'ml-20' : 'ml-0'}`}>
+        
+        {/* Top Header */}
+        <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30 shadow-sm">
+          <div className="flex items-center gap-4">
+            {isMobile && (
+              <button 
+                onClick={() => setSidebarOpen(true)} 
+                className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <Menu className="w-6 h-6" />
               </button>
-            </div>
-
-            {/* Profile */}
-            <div className="flex items-center gap-3 mb-8">
-              <div className="w-12 h-12 bg-secondary rounded-xl flex items-center justify-center text-primary font-bold">RK</div>
-              <div>
-                <p className="font-bold text-sm">Ravi Kumar</p>
-                <p className="text-white/50 text-xs">Platinum Member</p>
-              </div>
-            </div>
-
-            {/* Menu */}
-            <nav className="flex-1 space-y-1">
-              {menuItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                    activeTab === item.id
-                      ? 'bg-secondary/15 text-secondary'
-                      : 'text-white/60 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.label}
-                  {item.badge && (
-                    <span className="ml-auto bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </nav>
-
-            {/* Logout */}
-            <button className="flex items-center gap-3 px-4 py-3 text-white/40 hover:text-white/70 text-sm transition-colors mt-4">
-              <LogOut className="w-5 h-5" />
-              Logout
-            </button>
+            )}
+            <h1 className="text-xl font-bold text-primary hidden sm:block">
+              {activeTab === 'profile' && 'My Profile'}
+              {activeTab === 'applications' && 'My Applications'}
+              {activeTab === 'documents' && 'Documents'}
+              {activeTab === 'membership' && 'Membership'}
+              {activeTab === 'earnings' && 'Earnings & Payments'}
+              {activeTab === 'notifications' && 'Notifications'}
+              {activeTab === 'settings' && 'Account Settings'}
+              {activeTab === 'terms' && 'Terms & Conditions'}
+              {activeTab === 'privacy' && 'Privacy Policy'}
+              {activeTab === 'refund' && 'Refund Policy'}
+              {activeTab === 'about' && 'About Us'}
+              {activeTab === 'services' && 'Services'}
+              {activeTab === 'contact' && 'Contact Support'}
+            </h1>
           </div>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1 min-w-0 p-4 md:p-8 lg:p-10">
-          {/* Overview */}
-          {activeTab === 'overview' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-              <div className="mb-8">
-                <h1 className="text-2xl font-bold text-primary">Welcome back, Ravi! 👋</h1>
-                <p className="text-gray-500 text-sm mt-1">Here&apos;s your teaching activity overview.</p>
+          
+          <div className="flex items-center gap-4">
+            <button className="p-2 relative text-gray-400 hover:text-primary transition-colors" onClick={() => handleTabChange('notifications')}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-bell"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+            </button>
+            
+            <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
+              <div className="flex flex-col items-end hidden sm:flex">
+                <span className="text-sm font-bold text-gray-800 leading-none">{currentProfile.full_name}</span>
+                <span className="text-xs text-emerald-600 font-medium mt-1">
+                  {currentProfile.status === 'Verified' ? 'Verified Tutor' : 'Pending Verification'}
+                </span>
               </div>
-
-              {/* Stats */}
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                {dashboardStats.map((stat, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: i * 0.1 }}
-                    className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className={`w-10 h-10 ${stat.color} rounded-xl flex items-center justify-center`}>
-                        <stat.icon className="w-5 h-5 text-white" />
-                      </div>
-                    </div>
-                    <p className="text-2xl font-bold text-primary">{stat.value}</p>
-                    <p className="text-gray-500 text-xs mt-1">{stat.label}</p>
-                    <p className="text-xs text-emerald-500 font-medium mt-2 flex items-center gap-1">
-                      <TrendingUp className="w-3 h-3" /> {stat.change}
-                    </p>
-                  </motion.div>
-                ))}
+              <div className="w-10 h-10 rounded-full bg-secondary text-primary font-bold flex items-center justify-center border-2 border-white shadow-sm">
+                {initials}
               </div>
+            </div>
+          </div>
+        </header>
 
-              {/* Chart */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8">
-                <h3 className="font-bold text-primary mb-6">Earnings Overview</h3>
-                <div className="flex items-end gap-3 h-48">
-                  {earningsData.map((item, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                      <span className="text-xs font-semibold text-primary">₹{(item.amount / 1000).toFixed(1)}k</span>
-                      <motion.div
-                        initial={{ height: 0 }}
-                        animate={{ height: `${(item.amount / maxEarning) * 100}%` }}
-                        transition={{ duration: 0.6, delay: i * 0.1 }}
-                        className={`w-full rounded-t-lg ${i === earningsData.length - 1 ? 'bg-secondary' : 'bg-primary/20'} min-h-[8px]`}
-                      />
-                      <span className="text-xs text-gray-400">{item.month}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recent Activity */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <h3 className="font-bold text-primary mb-4">Recent Activity</h3>
-                <div className="space-y-3">
-                  {notifications.slice(0, 3).map((n) => (
-                    <div key={n.id} className={`flex items-start gap-3 p-3 rounded-xl ${n.read ? 'bg-gray-50' : 'bg-secondary/5 border border-secondary/10'}`}>
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${n.read ? 'bg-gray-300' : 'bg-secondary'}`} />
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-700">{n.text}</p>
-                        <p className="text-xs text-gray-400 mt-1">{n.time}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Available Tuitions */}
-          {activeTab === 'available' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-              <h2 className="text-2xl font-bold text-primary mb-6">Available Tuitions</h2>
-              <div className="space-y-4">
-                {availableTuitions.map((t) => (
-                  <div key={t.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-bold text-primary">{t.subject}</h3>
-                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{t.class}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.mode === 'Online' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>{t.mode}</span>
-                        </div>
-                        <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                          <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{t.location}</span>
-                          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{t.timing}</span>
-                          <span className="flex items-center gap-1"><IndianRupee className="w-3.5 h-3.5" />{t.salary}/mo</span>
-                        </div>
-                        <p className="text-xs text-gray-400 mt-2">Posted {t.posted}</p>
-                      </div>
-                      <button className="bg-secondary hover:bg-secondary-light text-primary font-bold px-6 py-2.5 rounded-xl text-sm transition-all hover:shadow-md flex-shrink-0 flex items-center gap-1">
-                        Apply <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Applied Tuitions */}
-          {activeTab === 'applied' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-              <h2 className="text-2xl font-bold text-primary mb-6">Applied Tuitions</h2>
-              <div className="space-y-4">
-                {appliedTuitions.map((t) => (
-                  <div key={t.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <h3 className="font-bold text-primary">{t.subject} — {t.class}</h3>
-                        <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-500">
-                          <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{t.location}</span>
-                          <span className="flex items-center gap-1"><IndianRupee className="w-3.5 h-3.5" />{t.salary}/mo</span>
-                        </div>
-                      </div>
-                      <span className={`px-4 py-1.5 rounded-full text-xs font-bold ${t.statusColor}`}>
-                        {t.status}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Earnings */}
-          {activeTab === 'earnings' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-              <h2 className="text-2xl font-bold text-primary mb-6">Earnings</h2>
-              <div className="grid sm:grid-cols-3 gap-4 mb-8">
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <p className="text-gray-500 text-sm">This Month</p>
-                  <p className="text-3xl font-bold text-primary mt-1">₹12,500</p>
-                </div>
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <p className="text-gray-500 text-sm">Total Earnings</p>
-                  <p className="text-3xl font-bold text-primary mt-1">₹61,000</p>
-                </div>
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                  <p className="text-gray-500 text-sm">Pending</p>
-                  <p className="text-3xl font-bold text-amber-500 mt-1">₹3,000</p>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <h3 className="font-bold text-primary mb-4">Payment History</h3>
-                <div className="space-y-3">
-                  {[
-                    { month: 'October 2025', amount: '₹12,500', status: 'Paid', date: 'Oct 5' },
-                    { month: 'September 2025', amount: '₹10,000', status: 'Paid', date: 'Sep 5' },
-                    { month: 'August 2025', amount: '₹11,000', status: 'Paid', date: 'Aug 5' },
-                  ].map((p, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                      <div>
-                        <p className="font-semibold text-primary text-sm">{p.month}</p>
-                        <p className="text-xs text-gray-400">Received on {p.date}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-primary">{p.amount}</p>
-                        <span className="text-xs text-emerald-600 font-medium">{p.status}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Notifications */}
-          {activeTab === 'notifications' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-              <h2 className="text-2xl font-bold text-primary mb-6">Notifications</h2>
-              <div className="space-y-3">
-                {notifications.map((n) => (
-                  <div key={n.id} className={`bg-white rounded-xl border p-5 transition-shadow hover:shadow-sm ${
-                    n.read ? 'border-gray-100' : 'border-secondary/20 bg-secondary/5'
-                  }`}>
-                    <div className="flex items-start gap-3">
-                      <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${n.read ? 'bg-gray-300' : 'bg-secondary'}`} />
-                      <div>
-                        <p className={`text-sm ${n.read ? 'text-gray-600' : 'text-gray-800 font-medium'}`}>{n.text}</p>
-                        <p className="text-xs text-gray-400 mt-1">{n.time}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Settings */}
-          {activeTab === 'settings' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-              <h2 className="text-2xl font-bold text-primary mb-6">Profile Settings</h2>
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center text-white text-2xl font-bold">RK</div>
-                  <div>
-                    <h3 className="font-bold text-primary text-xl">Ravi Kumar</h3>
-                    <p className="text-gray-500 text-sm">Platinum Member • Verified Tutor</p>
-                    <span className="inline-flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mt-1 font-medium">
-                      <CheckCircle2 className="w-3 h-3" /> Profile Verified
-                    </span>
-                  </div>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-6">
-                  {[
-                    { label: 'Full Name', value: 'Ravi Kumar' },
-                    { label: 'Phone', value: '+91 98765 43210' },
-                    { label: 'Email', value: 'ravi.kumar@email.com' },
-                    { label: 'City', value: 'Patna, Bihar' },
-                    { label: 'Qualification', value: 'M.Sc. Mathematics' },
-                    { label: 'Experience', value: '5+ Years' },
-                    { label: 'Subjects', value: 'Mathematics, Physics' },
-                    { label: 'Membership', value: 'Platinum (₹1,000)' },
-                  ].map((field, i) => (
-                    <div key={i}>
-                      <label className="block text-xs text-gray-400 font-medium mb-1">{field.label}</label>
-                      <p className="text-sm font-semibold text-primary bg-gray-50 rounded-xl px-4 py-3">{field.value}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-8 flex gap-3">
-                  <button className="bg-primary text-white font-bold px-6 py-3 rounded-xl text-sm hover:bg-primary-light transition-all">Edit Profile</button>
-                  <button className="bg-gray-100 text-gray-600 font-medium px-6 py-3 rounded-xl text-sm hover:bg-gray-200 transition-all">Change Password</button>
-                </div>
-              </div>
-            </motion.div>
-          )}
+        {/* Dynamic Content */}
+        <main className="flex-1 overflow-y-auto flex flex-col">
+          <div className={`flex-1 ${['terms', 'privacy', 'refund', 'about', 'services', 'contact'].includes(activeTab) ? '' : 'p-4 sm:p-8 w-full max-w-6xl mx-auto'}`}>
+            {renderTab()}
+          </div>
+          <Footer hideStudentOptions={true} isDashboard={true} />
         </main>
+        
       </div>
     </div>
   );
