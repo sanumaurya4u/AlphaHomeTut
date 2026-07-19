@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Mail, Lock, User, UserPlus, Loader2, GraduationCap, BookOpen } from 'lucide-react';
-import { signUp } from '@/services/authService';
+import { signUp, signInWithGoogle } from '@/services/authService';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 
 export default function Signup() {
   const [formData, setFormData] = useState({
@@ -150,6 +151,26 @@ export default function Signup() {
                 <><UserPlus className="w-5 h-5" /> Create Account</>
               )}
             </button>
+
+            <div className="relative flex items-center gap-4 my-6">
+              <div className="flex-1 border-t border-white/20"></div>
+              <span className="text-white/50 text-sm font-medium">or</span>
+              <div className="flex-1 border-t border-white/20"></div>
+            </div>
+
+            <GoogleSignInButton
+              onClick={async () => {
+                try {
+                  await signInWithGoogle();
+                  toast.success('Account verified! Welcome!');
+                  navigate('/home');
+                } catch (error) {
+                  console.error('Google signup error:', error);
+                  toast.error(error.message || 'Google signup failed.');
+                }
+              }}
+              label="Sign up with Google (Student/Parent)"
+            />
           </form>
 
           <p className="text-center text-white/50 text-sm mt-6">

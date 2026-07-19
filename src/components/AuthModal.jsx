@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, UserPlus, LogIn, Loader2, BookOpen } from 'lucide-react';
-import { signIn, signUp } from '@/services/authService';
+import { signIn, signUp, signInWithGoogle } from '@/services/authService';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 import toast from 'react-hot-toast';
 
 export default function AuthModal({ isOpen, onClose, onSuccess, role = 'student' }) {
@@ -183,6 +184,27 @@ export default function AuthModal({ isOpen, onClose, onSuccess, role = 'student'
                       <><UserPlus className="w-4 h-4" /> Sign Up</>
                     )}
                   </button>
+
+                  <div className="relative flex items-center gap-4 my-4">
+                    <div className="flex-1 border-t border-white/20"></div>
+                    <span className="text-white/50 text-xs font-medium">or</span>
+                    <div className="flex-1 border-t border-white/20"></div>
+                  </div>
+
+                  <GoogleSignInButton
+                    onClick={async () => {
+                      try {
+                        await signInWithGoogle();
+                        toast.success(isLogin ? 'Successfully logged in!' : 'Account created and verified!');
+                        onSuccess?.();
+                        onClose();
+                      } catch (error) {
+                        console.error('Google auth error:', error);
+                        toast.error(error.message || 'Google authentication failed.');
+                      }
+                    }}
+                    label={isLogin ? 'Sign in with Google' : 'Sign up with Google'}
+                  />
                 </form>
 
                 <div className="mt-6 text-center">

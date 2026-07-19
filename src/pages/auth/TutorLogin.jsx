@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Mail, Lock, LogIn, Loader2, GraduationCap } from 'lucide-react';
-import { signIn } from '@/services/authService';
+import { signIn, signInWithGoogle } from '@/services/authService';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/supabase/config';
 
@@ -49,6 +50,36 @@ export default function TutorLogin() {
       setLoading(false);
     }
   };
+
+  const handleGoogleLogin = async () => {
+    try {
+      const { user } = await signInWithGoogle();
+      
+      // Allow time for database trigger to create profile if new user
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+        
+      if (error) throw error;
+      
+      if (profile.role !== 'tutor') {
+        await supabase.auth.signOut();
+        throw new Error('Access denied. This portal is for tutors only.');
+      }
+
+      await refreshProfile();
+      toast.success('Welcome back, Tutor!');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Tutor Google Login error:', error);
+      toast.error(error.message || 'Google login failed.');
+    }
+  };
+
 
   const inputClass = "w-full bg-[#061B45]/50 border border-white/20 rounded-xl px-4 py-3.5 text-white placeholder-white/40 focus:border-secondary transition-all text-sm backdrop-blur-sm";
 
@@ -115,6 +146,17 @@ export default function TutorLogin() {
                 <><LogIn className="w-5 h-5" /> Sign In</>
               )}
             </button>
+
+            <div className="relative flex items-center gap-4 my-6">
+              <div className="flex-1 border-t border-white/20"></div>
+              <span className="text-white/50 text-sm font-medium">or</span>
+              <div className="flex-1 border-t border-white/20"></div>
+            </div>
+
+            <GoogleSignInButton
+              onClick={handleGoogleLogin}
+              label="Sign in with Google"
+            />
           </form>
 
           <p className="text-center text-white/50 text-sm mt-6">

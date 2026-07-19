@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Mail, Lock, LogIn, Loader2 } from 'lucide-react';
-import { signIn } from '@/services/authService';
+import { signIn, signInWithGoogle } from '@/services/authService';
+import GoogleSignInButton from '@/components/GoogleSignInButton';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -88,6 +89,26 @@ export default function Login() {
                 <><LogIn className="w-5 h-5" /> Sign In</>
               )}
             </button>
+
+            <div className="relative flex items-center gap-4 my-6">
+              <div className="flex-1 border-t border-white/20"></div>
+              <span className="text-white/50 text-sm font-medium">or</span>
+              <div className="flex-1 border-t border-white/20"></div>
+            </div>
+
+            <GoogleSignInButton
+              onClick={async () => {
+                try {
+                  await signInWithGoogle();
+                  toast.success('Welcome back!');
+                  navigate('/home');
+                } catch (error) {
+                  console.error('Google login error:', error);
+                  toast.error(error.message || 'Google login failed.');
+                }
+              }}
+              label="Sign in with Google"
+            />
           </form>
 
           <p className="text-center text-white/50 text-sm mt-6">
