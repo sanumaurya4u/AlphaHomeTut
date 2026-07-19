@@ -1,20 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Star, Shield, Zap, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, Star, Shield, Zap, ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { getMemberships, createMembership, updateMembershipStatus } from '@/services/membershipService';
+import { loadRazorpayScript, createRazorpayOrder, verifyRazorpayPayment, openRazorpayCheckout } from '@/services/razorpayService';
+import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
-import Modal from '@/components/admin/Modal';
 
 export default function TutorMembership({ tutorId }) {
   const [currentPlan, setCurrentPlan] = useState('Basic');
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState(false);
-  
-  // Payment Modal States
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [upiId, setUpiId] = useState('');
-  const [paymentError, setPaymentError] = useState('');
+  const { user, profile } = useAuth();
 
   useEffect(() => {
     const fetchMembership = async () => {
@@ -39,47 +35,82 @@ export default function TutorMembership({ tutorId }) {
     fetchMembership();
   }, [tutorId]);
 
-  const handleUpgrade = (plan) => {
+  const handleUpgrade = async (plan) => {
     if (!tutorId) {
       toast.error('Please log in first');
       return;
     }
-    setSelectedPlan(plan);
-    setUpiId('');
-    setPaymentError('');
-    setIsPaymentModalOpen(true);
-  };
 
-  const handleConfirmPayment = async () => {
-    if (!tutorId || !selectedPlan) return;
-    
-    const formattedUpi = upiId.trim().toLowerCase();
-    if (formattedUpi !== 'sanumauryau@ybl') {
-      setPaymentError("Payment failed: Invalid UPI ID. Please use 'sanumauryau@ybl'");
-      toast.error('Transaction Failed');
+    const priceNum = parseInt(plan.price.replace(/[^0-9]/g, '') || '0', 10);
+    if (priceNum <= 0) {
+      toast.error('Cannot process payment for a free plan');
       return;
     }
 
     setUpgrading(true);
-    setPaymentError('');
+
     try {
-      const amount = parseInt(selectedPlan.price.replace(/[^0-9]/g, '') || '0', 10);
-      const membership = await createMembership({
-        tutor_id: tutorId,
-        plan_name: selectedPlan.name,
-        amount: amount,
+      // Step 1: Load Razorpay checkout script
+      await loadRazorpayScript();
+
+      // Step 2: Create order via backend (amount in paise)
+      const amountInPaise = priceNum * 100;
+      
+      // Razorpay enforces a strict 40 character limit on the receipt field
+      let receiptId = `mem_${plan.id}_${tutorId}`.replace(/-/g, '');
+      if (receiptId.length > 40) receiptId = receiptId.substring(0, 40);
+      
+      const orderData = await createRazorpayOrder(
+        amountInPaise,
+        'INR',
+        receiptId
+      );
+
+      // Step 3: Open Razorpay checkout modal
+      const paymentResult = await openRazorpayCheckout({
+        order_id: orderData.order_id,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: 'Alpha Home Tuition',
+        description: `${plan.name} Membership Plan`,
+        prefill: {
+          name: profile?.full_name || user?.user_metadata?.full_name || '',
+          email: user?.email || '',
+          contact: profile?.phone || '',
+        },
+        theme: { color: '#061B45' },
       });
 
-      if (membership?.id) {
-        await updateMembershipStatus(membership.id, 'Completed');
+      // Step 4: Verify payment signature via backend
+      const verification = await verifyRazorpayPayment(
+        paymentResult.razorpay_payment_id,
+        paymentResult.razorpay_order_id,
+        paymentResult.razorpay_signature
+      );
+
+      if (!verification.verified) {
+        toast.error('Payment verification failed. Please contact support.');
+        return;
       }
 
-      toast.success(`Successfully upgraded to ${selectedPlan.name}`);
-      setCurrentPlan(selectedPlan.name);
-      setIsPaymentModalOpen(false);
+      // Step 5: Record membership in Supabase
+      const membership = await createMembership({
+        tutor_id: tutorId,
+        plan_name: plan.name,
+        amount: priceNum,
+        payment_status: 'Completed'
+      });
+
+      toast.success(`Successfully upgraded to ${plan.name}!`);
+      setCurrentPlan(plan.name);
     } catch (error) {
       console.error('Payment error:', error);
-      toast.error('Failed to upgrade membership');
+
+      if (error.message === 'Payment cancelled by user') {
+        toast('Payment cancelled', { icon: '↩️' });
+      } else {
+        toast.error(error.message || 'Payment failed. Please try again.');
+      }
     } finally {
       setUpgrading(false);
     }
@@ -204,83 +235,6 @@ export default function TutorMembership({ tutorId }) {
           </motion.div>
         ))}
       </div>
-
-      <Modal
-        isOpen={isPaymentModalOpen}
-        onClose={() => {
-          setIsPaymentModalOpen(false);
-          setUpiId('');
-          setPaymentError('');
-        }}
-        title="Complete Payment"
-        size="sm"
-      >
-        <div className="flex flex-col gap-5">
-          {/* Plan Summary */}
-          <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10">
-            <p className="text-sm text-gray-500 font-medium">Selected Plan</p>
-            <div className="flex justify-between items-center mt-1">
-              <span className="font-bold text-lg text-primary">{selectedPlan?.name} Plan</span>
-              <span className="font-extrabold text-xl text-primary">{selectedPlan?.price}</span>
-            </div>
-            <p className="text-xs text-gray-400 mt-2">Validity: 1 Year (Auto-renewing)</p>
-          </div>
-
-          {/* UPI Payment Instructions */}
-          <div className="flex flex-col gap-3">
-            <label className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
-              Enter UPI ID for Payment
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={upiId}
-                onChange={(e) => {
-                  setUpiId(e.target.value);
-                  if (paymentError) setPaymentError('');
-                }}
-                placeholder="e.g. yourname@upi"
-                className={`w-full px-4 py-3 rounded-xl border-2 text-sm transition-all focus:outline-none ${
-                  paymentError 
-                    ? 'border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10' 
-                    : 'border-gray-200 focus:border-primary focus:ring-4 focus:ring-primary/10'
-                }`}
-              />
-            </div>
-            
-            {paymentError && (
-              <p className="text-xs text-rose-500 font-medium flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                {paymentError}
-              </p>
-            )}
-
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 leading-relaxed">
-              <strong>Demo Mode Instructions:</strong> Please use the UPI ID <code className="bg-amber-100 px-1 py-0.5 rounded font-mono select-all text-amber-900 font-bold">sanumauryau@ybl</code> to simulate a successful payment. Any other ID will fail.
-            </div>
-          </div>
-
-          {/* Payment Actions */}
-          <button
-            disabled={upgrading || !upiId.trim()}
-            onClick={handleConfirmPayment}
-            className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              !upiId.trim() || upgrading
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-primary text-white hover:bg-primary-light hover:shadow-md'
-            }`}
-          >
-            {upgrading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Processing Payment...
-              </>
-            ) : (
-              'Pay Now'
-            )}
-          </button>
-        </div>
-      </Modal>
     </motion.div>
   );
 }

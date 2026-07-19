@@ -8,7 +8,7 @@ export async function createMembership(data) {
     tutor_id: data.tutor_id,
     plan: data.plan_name || data.plan,
     amount: data.amount,
-    payment_status: 'Pending',
+    payment_status: data.payment_status || 'Completed',
     start_date: new Date().toISOString(),
     end_date: expiresAt.toISOString(),
   };
